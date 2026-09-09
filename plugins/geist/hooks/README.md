@@ -4,7 +4,7 @@ Geist bundles lifecycle hooks for ordered workspace instructions, automatic docu
 
 For installation, project setup, and environment variables, see [Geist configuration and usage](../README.md).
 
-Codex discovers [hooks/hooks.json](./hooks.json) automatically. Copilot's plugin manifest selects [copilot-hooks.json](./copilot-hooks.json). Both call the bundled runner using the installed plugin's `PLUGIN_ROOT`, with separate Windows commands.
+[hooks/hooks.json](./hooks.json) contains the Codex definitions. Codex 0.153.4 skips hooks for portable plugins; use the [user-hook registration workaround](../README.md#openai-codex-cli) until the host supports their discovery. The registration uses absolute, shell-quoted runner paths and leaves trust review to Codex. Copilot's plugin manifest selects [copilot-hooks.json](./copilot-hooks.json). Bundled plugin commands use the installed plugin's `PLUGIN_ROOT`, with separate Windows commands.
 
 Host contracts are documented in the [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) and [Copilot hook reference](https://docs.github.com/en/copilot/reference/hooks-reference).
 

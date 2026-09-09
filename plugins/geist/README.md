@@ -21,7 +21,15 @@ Static instructions and record-management tools run from bundled JavaScript. Sem
 codex plugin add geist@agent-exchange
 ```
 
-Open `/hooks` in Codex to review and trust the installed hooks, then start a new session. Review changed hooks again after updating the plugin. Codex requires this trust step before plugin hooks run; see the [host documentation](https://learn.chatgpt.com/docs/hooks).
+Codex 0.153.4 loads Geist's portable MCP manifest but skips portable-plugin hooks, so marketplace installation alone shows zero hooks. Until Codex supports both, register equivalent user hooks from the installed plugin:
+
+```powershell
+node "<installed-geist>/scripts/setup-codex-hooks.mjs" install
+```
+
+This merges six Geist hooks into `~/.codex/hooks.json` (or `CODEX_HOME`), preserves other hooks, and does not grant trust. Restart Codex, open `/hooks`, review and trust the six entries labeled `Geist (Agent Exchange) compatibility`, then start a new session. They appear as user hooks. Review changed hooks again after updating the plugin. See the [host trust documentation](https://learn.chatgpt.com/docs/hooks).
+
+Rerun registration from each new installed snapshot to update the runner paths. Before uninstalling Geist, or once a Codex release discovers its portable hooks directly, run the same script with `remove`. This removes only its compatibility registrations; plugin removal alone cannot remove user hooks. The script keeps a `.geist-backup` of a pre-existing hooks file.
 
 ### GitHub Copilot CLI
 
@@ -176,7 +184,8 @@ See the [hook reference](./hooks/README.md#external-controller-protocol) for the
 
 | Symptom | Check |
 | --- | --- |
-| Hooks do not run in Codex | Open `/hooks`, review and trust Geist's hooks, then start a new session. |
+| Zero Geist hooks in Codex | On Codex 0.153.4, run `setup-codex-hooks.mjs install` from the installed plugin, then restart. |
+| Geist hooks are installed but inactive | Open `/hooks`, review and trust the six Geist compatibility hooks, then start a new session. |
 | The runner cannot start | Check `node --version` and, on Windows, `pwsh --version` in the host environment. |
 | Workspace instructions are missing | Check the active project's `.geist/config.toml`, its `instructions.files` list, and any environment overrides, then start a new session. |
 | Instruction configuration fails | Confirm the TOML is valid and every listed file exists inside the config directory. |

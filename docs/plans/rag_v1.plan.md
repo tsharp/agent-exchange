@@ -44,6 +44,8 @@ Ship bundled hooks, CLI, and MCP entry points. The explicit `prepare_runtime` MC
 
 Codex loads root `plugin.json` and typed `mcp.json` using the Agent Plugins 1.0 schemas, so `${PLUGIN_ROOT}` resolves at installation/launch. Keep `.codex-plugin/plugin.json` as compatibility metadata and `.mcp.json` for Copilot. Legacy Codex MCP configuration does not expand the plugin-root placeholder; tests must exercise host loading, not only substitute an absolute path themselves.
 
+Codex 0.153.4 explicitly skips hook loading for portable plugins. Keep the working portable MCP package and provide `scripts/setup-codex-hooks.mjs install|remove` as a temporary user-hook registration workaround. It preserves unrelated hooks, replaces its previous registrations on update, and never grants trust. Remove these registrations before plugin uninstall or migration to native portable-hook discovery. Marketplace installation alone does not activate hooks on this host version.
+
 ## Records
 
 Default root: `docs/`. Recursively scan `.md` files, including hidden directories. Directory names have no semantic meaning. IDs use `/`, end in `.md`, and contain no empty, `.` or `..` components. Reject absolute paths, Windows alternate streams, and symlink/junction files or directories. Apply containment checks to discovery, reads, and writes. IDs compare case-sensitively; creation also respects filesystem collision rules.
@@ -125,7 +127,7 @@ The v1 implementation is available in `plugins/geist`. The repository enables re
 
 Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and a cold installed MCP server recovering from unavailable search through concurrent preparation calls without restarting. Repeated preparation succeeds without the setup script. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
 
-A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Hook adapter tests invoke the shipped commands; they do not establish interactive hook trust. The explicit `test:codex` integration test installs the package through Codex 0.153.4 and verifies MCP initialization through its app server from a separate workspace, with no model turn. This test reproduced the legacy manifest startup failure and passes with the portable manifests. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
+A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Hook adapter tests invoke the shipped commands; they do not establish interactive hook trust. The explicit `test:codex` integration test installs the package through Codex 0.153.4 and verifies MCP initialization and six registered user hooks through its app server from a separate workspace, with no model turn. It verifies registration idempotence, unrelated-hook preservation, removal, untrusted status, and execution of the host-resolved command against consuming-project instructions. Package paths include spaces and shell metacharacters. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
 
 ## References
 
