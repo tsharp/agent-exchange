@@ -1,6 +1,6 @@
 {
   "name": "geist",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
   "author": {
     "name": "tsharp",
@@ -9,7 +9,11 @@
   "homepage": "https://github.com/tsharp/agent-exchange",
   "repository": "https://github.com/tsharp/agent-exchange",
   "license": "MIT",
-  "keywords": ["agent-skills", "hooks", "productivity"],
+  "keywords": [
+    "agent-skills",
+    "hooks",
+    "productivity"
+  ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
