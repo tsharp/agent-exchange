@@ -1,4 +1,5 @@
 ---
+kind: plan
 state: active
 version: 2026-09-09
 ---
@@ -108,6 +109,6 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 
 ## References
 
-- [Transformers.js](https://huggingface.co/docs/transformers.js/v3.8.1/index): tokenization and ONNX feature extraction.
+- [Tokenizers.js](https://github.com/huggingface/tokenizers.js): text tokenization without image-processing dependencies.
 - [ONNX Runtime](https://onnxruntime.ai/docs/get-started/with-javascript/node.html): local inference.
 - [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools): schemas and structured results.
