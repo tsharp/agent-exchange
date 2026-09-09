@@ -140,7 +140,7 @@ Deleting `documents.json` is also safe; the next search recreates it. Locks from
 
 ### Record tools
 
-The plugin registers a local `geist` MCP server for both hosts. Its workspace is the host process working directory, overridable with `GEIST_WORKSPACE_DIR`. The model is loaded only for search or rebuild.
+The plugin registers a local `geist` MCP server for both hosts. Codex loads the portable root `plugin.json` and typed `mcp.json`; Copilot uses its compatibility manifest and `.mcp.json`. Its workspace is the host process working directory, overridable with `GEIST_WORKSPACE_DIR`. The model is loaded only for search or rebuild.
 
 | Tool | Purpose |
 | --- | --- |
@@ -179,12 +179,16 @@ See the [hook reference](./hooks/README.md#external-controller-protocol) for the
 | Instruction configuration fails | Confirm the TOML is valid and every listed file exists inside the config directory. |
 | No document hints appear | Check `[rag].enabled`, run setup and index for the installed plugin, and try `min_score = 0`. Check diagnostics for timeouts or invalid records. |
 | MCP reads the wrong record directory | Set `GEIST_WORKSPACE_DIR` in the MCP host environment to the consuming project's absolute path. |
+| MCP closes during initialization with a literal `${PLUGIN_ROOT}` path in the error | Check that the installed plugin includes root `plugin.json` and `mcp.json`. Codex 0.153.4 does not expand that placeholder in the legacy `.mcp.json` launch path; the portable MCP configuration handles it. |
 
 ## Develop Geist
 
 ```text
-.codex-plugin/plugin.json   # Codex manifest
+plugin.json                # Portable plugin identity for Codex
+mcp.json                   # Portable typed MCP configuration
+.codex-plugin/plugin.json   # Codex compatibility metadata
 .github/plugin/plugin.json # Copilot manifest
+.mcp.json                  # Copilot compatibility MCP configuration
 hooks/                     # Host hook maps and protocol reference
 src/hooks/                 # TypeScript implementation
 runtime/hooks/run.mjs      # Committed standalone runtime
@@ -208,3 +212,7 @@ Commit the generated runtime together with its source. Geist's checks type-check
 After preparing the model, run `npm run test:onnx --workspace plugins/geist` from the marketplace root for real inference and both prompt adapters. It uses a temporary four-document corpus and reports measured timings, then tests setup in a copied installation; that setup test needs network access. The regular tests use deterministic embeddings for cache and MCP behavior and require no model download.
 
 Bundled dependency licenses are included in `runtime/THIRD_PARTY_NOTICES.txt` and checked during the build.
+
+Run `npm run test:codex --workspace plugins/geist` for an actual Codex installation and MCP startup regression test. It uses a temporary marketplace, isolated Codex configuration, and a separate consuming workspace; no model turn is submitted. Codex must be available as an executable. On Windows, set `GEIST_CODEX_BIN` to the full path of `codex.exe` before running it. Keep the version in `plugin.json`, both compatibility manifests, and `package.json` aligned.
+
+Portable packaging follows the [OpenAI plugin package documentation](https://developers.openai.com/plugins/build/plugins).

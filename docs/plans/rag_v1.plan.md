@@ -42,6 +42,8 @@ Store the cache at `.geist/cache/rag/documents.json`. Keep the downloaded model 
 
 Ship bundled hooks, CLI, and MCP entry points. An explicit setup installs optional native/runtime dependencies and downloads the pinned model. Hooks and searches never invoke npm or download models. MCP starts without loading the model; non-search tools work before preparation.
 
+Codex loads root `plugin.json` and typed `mcp.json` using the Agent Plugins 1.0 schemas, so `${PLUGIN_ROOT}` resolves at installation/launch. Keep `.codex-plugin/plugin.json` as compatibility metadata and `.mcp.json` for Copilot. Legacy Codex MCP configuration does not expand the plugin-root placeholder; tests must exercise host loading, not only substitute an absolute path themselves.
+
 ## Records
 
 Default root: `docs/`. Recursively scan `.md` files, including hidden directories. Directory names have no semantic meaning. IDs use `/`, end in `.md`, and contain no empty, `.` or `..` components. Reject absolute paths, Windows alternate streams, and symlink/junction files or directories. Apply containment checks to discovery, reads, and writes. IDs compare case-sensitively; creation also respects filesystem collision rules.
@@ -122,7 +124,7 @@ The v1 implementation is available in `plugins/geist`. The repository enables re
 
 Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and setup outside the checkout. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
 
-A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Host adapter tests invoke the shipped hook commands; they do not establish that an interactive host has installed and trusted this development version. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
+A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Hook adapter tests invoke the shipped commands; they do not establish interactive hook trust. The explicit `test:codex` integration test installs the package through Codex 0.153.4 and verifies MCP initialization through its app server from a separate workspace, with no model turn. This test reproduced the legacy manifest startup failure and passes with the portable manifests. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
 
 ## References
 

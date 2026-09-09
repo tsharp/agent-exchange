@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "validate": "node scripts/validate-hooks.mjs",
     "test": "npm run typecheck && node scripts/build-hooks.mjs --check && npm run validate && node --test scripts/test-hooks.mjs scripts/test-installed-hooks.mjs scripts/test-rag.mjs scripts/test-mcp.mjs scripts/test-rag-hooks.mjs",
-    "test:onnx": "node --test scripts/test-onnx.mjs"
+    "test:onnx": "node --test scripts/test-onnx.mjs",
+    "test:codex": "node --test scripts/test-codex-mcp.mjs"
   },
   "devDependencies": {
     "@huggingface/tokenizers": "0.2.0",

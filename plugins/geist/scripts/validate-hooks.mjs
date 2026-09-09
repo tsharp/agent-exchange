@@ -9,6 +9,14 @@ const readJson = (path) => JSON.parse(readFileSync(resolve(root, path), "utf8"))
 const packageJson = readJson("package.json");
 const codex = readJson(".codex-plugin/plugin.json");
 const copilot = readJson(".github/plugin/plugin.json");
+const portable = readJson("plugin.json");
+assert.equal(portable.$schema, "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json");
+assert.equal(portable.name, packageJson.name);
+assert.equal(portable.version, packageJson.version);
+assert.deepEqual(readJson("mcp.json"), {
+  $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  mcpServers: { geist: { type: "stdio", command: "node", args: ["${PLUGIN_ROOT}/runtime/mcp/run.mjs"] } },
+});
 assert.equal(codex.name, packageJson.name);
 assert.equal(copilot.name, packageJson.name);
 assert.equal(codex.version, packageJson.version);
