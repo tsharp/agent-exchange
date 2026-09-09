@@ -10,7 +10,7 @@ type Entry = { record: RecordData; chunks: string[]; vectors: number[][] };
 type Snapshot = { format: string; model: string; root: string; entries: Entry[] };
 export type Refresh = { total: number; updated: number; reused: number; removed: number; warnings: string[] };
 export type SearchOptions = Filters & { limit?: number; include_inactive?: boolean };
-export type Match = { id: string; title: string; path: string; score: number; excerpt: string };
+export type Match = { id: string; version: string; title: string; path: string; score: number; excerpt: string };
 
 export function chunksFor(record: RecordData): string[] {
   const text = record.body.trim();
@@ -96,7 +96,7 @@ export class DocumentCache {
         const similarity = norm ? dot / norm : 0;
         if (similarity > score) { score = similarity; best = index; }
       });
-      return { id: entry.record.id, title: entry.record.title,
+      return { id: entry.record.id, version: entry.record.version, title: entry.record.title,
         path: this.store.path(entry.record.id), score: Math.round(score * 1e6) / 1e6,
         excerpt: entry.chunks[best].replace(/\s+/g, " ").slice(0, 240) };
     });

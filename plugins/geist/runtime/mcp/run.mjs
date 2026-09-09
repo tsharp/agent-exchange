@@ -44303,6 +44303,7 @@ var DocumentCache = class {
       });
       return {
         id: entry.record.id,
+        version: entry.record.version,
         title: entry.record.title,
         path: this.store.path(entry.record.id),
         score: Math.round(score * 1e6) / 1e6,

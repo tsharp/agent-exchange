@@ -94,7 +94,7 @@ The local stdio MCP server is named `geist`. Tools expose input schemas and stru
 | --- | --- | --- |
 | list_records | Optional kind/state/scope lists, prefix, offset (0), limit (50, max 200) | Summaries sorted by ID, total, next offset, warnings |
 | get_record | id | ID, title, body, metadata, links, sources, raw Markdown, SHA-256 version |
-| search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked IDs, titles, paths, scores, excerpts, warnings, refresh counts |
+| search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked IDs, versions, titles, paths, scores, excerpts, warnings, refresh counts |
 | create_record | id, complete raw markdown | Created record and cache invalidation status; existing files fail |
 | update_record | id, complete raw markdown, expected_version | Updated record; missing or changed records fail |
 | delete_record | id, expected_version | Deleted ID and cache invalidation status |
@@ -109,6 +109,7 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 
 - Ordered static instructions still work on both hosts, with no conversation capture.
 - Each configured prompt receives up to three configurable document hints within execution and text budgets.
+- Repeated hints are suppressed across hook processes in one session; edits and compaction restore eligibility. Budget exclusions, isolated sessions/hosts/roots, resume, cleanup, corrupt state, and blocked processing are tested without recording conversations.
 - A real local ONNX run demonstrates semantic retrieval.
 - Cache tests cover reuse, changes, deletions, renames, corruption, model/schema invalidation, rebuild, and no prompt persistence.
 - MCP tests cover tools, schemas, metadata preservation, filters, backlinks, conflicts, and containment.
@@ -119,7 +120,7 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 
 The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its document cache and prepared model remain local and ignored by Git.
 
-Windows validation passes 45 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, and lock recovery. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, refresh/rebuild, and setup outside the checkout. The four-document fixture indexed in about 224 ms, searched in 208 ms, and completed prompt hooks in about 300 ms. These are small-corpus smoke measurements, not a latency guarantee.
+Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and setup outside the checkout. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
 
 A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Host adapter tests invoke the shipped hook commands; they do not establish that an interactive host has installed and trusted this development version. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
 
@@ -128,3 +129,5 @@ A search for “How does Geist update or rebuild cached documents?” retrieves 
 - [Tokenizers.js](https://github.com/huggingface/tokenizers.js): text tokenization without image-processing dependencies.
 - [ONNX Runtime](https://onnxruntime.ai/docs/get-started/with-javascript/node.html): local inference.
 - [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools): schemas and structured results.
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks): session identity and post-compaction SessionStart.
+- [Copilot hooks](https://docs.github.com/en/copilot/reference/hooks-reference): transformed prompts and preCompact notifications.

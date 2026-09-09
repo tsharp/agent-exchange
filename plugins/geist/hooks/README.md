@@ -1,6 +1,6 @@
 # Geist hook reference
 
-Geist bundles six lifecycle hooks, ordered workspace instructions, automatic document retrieval, and an optional external controller. Its original hooks were ported from `tsharp/geist` at commit `4e35040`, with conversation capture removed.
+Geist bundles lifecycle hooks for ordered workspace instructions, automatic document retrieval, and an optional external controller. Its original hooks were ported from `tsharp/geist` at commit `4e35040`, with conversation capture removed.
 
 For installation, project setup, and environment variables, see [Geist configuration and usage](../README.md).
 
@@ -11,19 +11,24 @@ Host contracts are documented in the [Codex hook documentation](https://learn.ch
 | Lifecycle point | Codex | Copilot CLI |
 | --- | --- | --- |
 | Session starts | `SessionStart` | `sessionStart` |
-| Prompt submitted | `UserPromptSubmit` | `userPromptSubmitted` |
+| Prompt prepared | `UserPromptSubmit` | `userPromptTransformed` |
 | Subagent starts | `SubagentStart` | `subagentStart` |
 | Subagent stops | `SubagentStop` | `subagentStop` |
 | Agent turn stops | `Stop` | `agentStop` |
 | Session ends | `SessionEnd` | `sessionEnd` |
+| Context compaction | `SessionStart` with `source: compact` | `preCompact` |
 
 ## Processing order
 
-The runner normalizes the host payload, loads configured workspace instructions at startup events, runs automatic RAG on user prompts when enabled, runs additional in-process stages, and calls the optional external controller. It then emits one JSON object using the host's output format. A block decision stops the remaining pipeline stages. The runtime does not write conversation logs.
+The runner normalizes the host payload, loads configured workspace instructions at startup events, runs additional in-process stages, calls the optional external controller, and finally processes automatic RAG when enabled. It then emits one JSON object using the host's output format. A block decision stops the remaining pipeline stages. RAG runs last so blocked or failed processing cannot mark hints as delivered. Controllers receive the earlier accumulated context; it does not include the built-in RAG result. The runtime does not write conversation logs.
 
 Workspace instructions are injected only at `SessionStart` and `SubagentStart`. See [workspace configuration](../README.md#configure-workspace-instructions) for file selection and override behavior.
 
 The built-in RAG stage searches through a subprocess with a configured deadline, returns bounded document hints, and fails open. Its model is prepared outside hook execution. See [document retrieval](../README.md#enable-document-retrieval). The optional `ragContextStage` helper remains available for custom in-process retrievers; the default flow requires no custom controller or pipeline definition.
+
+Automatic delivery uses `session_id` (Codex) or `sessionId` (Copilot), accepts either spelling, and isolates state by host and record root within the workspace. Only emitted document IDs/versions are saved under `.geist/cache/rag/sessions/`, using hashed filenames and a process lock. Retrieval ranks before deduplication; unseen lower-ranked records do not fill gaps. Character-budget exclusions are not marked delivered. Session start resets state except for `source: resume`; session end removes it. Codex `source: compact`/`clear` and Copilot `preCompact` make hints eligible on the next prompt. Subagent and turn-stop events leave the parent state intact.
+
+Copilot's `userPromptTransformed` maps to the runner's normalized `UserPromptSubmit` event. The runner preserves `transformedPrompt` and appends bounded hints through `modifiedTransformedPrompt`; it returns `{}` when no context is added. Command-hook output from Copilot `userPromptSubmitted` is ignored by the host, so that event is not configured for injection. `preCompact` performs metadata cleanup only and emits `{}`. These contracts follow the [Copilot hook reference](https://docs.github.com/en/copilot/reference/hooks-reference); Codex resets follow its [SessionStart contract](https://learn.chatgpt.com/docs/hooks#sessionstart).
 
 ## External controller protocol
 

@@ -7,8 +7,8 @@ export function createDefaultPipeline(additionalStages: readonly HookStage[] = [
   const controller = externalControllerFromEnvironment();
   return createHookPipeline([
     injectWorkspaceContext,
-    automaticRag,
     ...additionalStages,
     ...(controller ? [controller] : []),
+    automaticRag,
   ]);
 }

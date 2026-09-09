@@ -73,6 +73,7 @@ function contextOutput(response: HookResponse): Record<string, unknown> {
         reason: [response.reason, context].filter(Boolean).join("\n\n"),
       }
     : {};
+  if (event === "PreCompact") return {};
   if (event === "Stop" || event === "SubagentStop" || event === "SessionEnd") return control;
   if (!context) return control;
 
@@ -86,6 +87,10 @@ function contextOutput(response: HookResponse): Record<string, unknown> {
     };
   }
 
+  if (event === "UserPromptSubmit") {
+    const transformed = stringField(input, "transformedPrompt");
+    return transformed ? { modifiedTransformedPrompt: `${transformed}\n\n${context}` } : control;
+  }
   return { ...control, additionalContext: context };
 }
 

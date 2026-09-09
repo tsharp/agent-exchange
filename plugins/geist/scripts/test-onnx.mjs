@@ -38,20 +38,36 @@ test("real ONNX ranks records and both prompt hooks inject bounded hints offline
   assert.equal(search.refresh.reused, 4);
   const timings = { index_ms: index.elapsed_ms, search_ms: search.elapsed_ms, hooks_ms: {} };
   for (const host of ["codex", "copilot"]) {
+    const session = host === "codex" ? { session_id: "onnx-session" } : { sessionId: "onnx-session" };
+    const transformed = `Host-prepared prompt: ${query}`;
+    const hook = (event, extra = {}) => {
+      const result = spawnSync(process.execPath, [resolve("runtime/hooks/run.mjs"), host, event], {
+        env, input: JSON.stringify({ cwd: workspace, prompt: query, transformedPrompt: transformed, ...session, ...extra }), encoding: "utf8", timeout: 5000,
+      });
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout);
+    };
+    const hintsFrom = (output) => {
+      const context = host === "codex" ? output.hookSpecificOutput?.additionalContext : output.modifiedTransformedPrompt?.slice(transformed.length + 2);
+      assert.ok(context);
+      assert.match(context, /untrusted reference data/);
+      assert.ok(context.length <= 1800);
+      if (host === "copilot") assert.ok(output.modifiedTransformedPrompt.startsWith(`${transformed}\n\n`));
+      return JSON.parse(context.slice(context.indexOf("\n") + 1));
+    };
     const started = performance.now();
-    const result = spawnSync(process.execPath, [resolve("runtime/hooks/run.mjs"), host, "UserPromptSubmit"], {
-      env, input: JSON.stringify({ cwd: workspace, prompt: query }), encoding: "utf8", timeout: 5000,
-    });
-    assert.equal(result.status, 0, result.stderr);
-    const output = JSON.parse(result.stdout);
-    const context = host === "codex" ? output.hookSpecificOutput?.additionalContext : output.additionalContext;
-    assert.ok(context, result.stderr);
-    assert.match(context, /untrusted reference data/);
-    assert.ok(context.length <= 1800);
-    const hints = JSON.parse(context.slice(context.indexOf("\n") + 1));
+    const hints = hintsFrom(hook("UserPromptSubmit"));
     assert.equal(hints.length, 3);
     assert.equal(hints[0].id, "database.md");
     timings.hooks_ms[host] = Math.round(performance.now() - started);
+    assert.deepEqual(hook("UserPromptSubmit"), {}, "unchanged real retrieval is suppressed");
+    assert.equal(cli("search", query).matches.length, 3, "explicit search ignores delivery state");
+    writeFileSync(join(workspace, "docs", "database.md"), `${records["database.md"]}\nRevised record for ${host}.`);
+    assert.deepEqual(hintsFrom(hook("UserPromptSubmit")).map((hint) => hint.id), ["database.md"]);
+    if (host === "codex") hook("SessionStart", { source: "compact" }); else hook("PreCompact", { trigger: "auto" });
+    assert.equal(hintsFrom(hook("UserPromptSubmit")).length, 3);
+    hook("SessionEnd");
+    writeFileSync(join(workspace, "docs", "database.md"), records["database.md"]);
   }
   writeFileSync(join(workspace, ".geist", "config.toml"), configuration.replace("top_k = 3", "top_k = 1"));
   assert.equal(cli("search", query).matches.length, 1);

@@ -156,6 +156,7 @@ test("search ranks distinct active records, applies filters, and never persists 
   const result = await f.cache.search(query);
   assert.deepEqual(result.matches.map((match) => match.id), ["a.md", "c.md"]);
   assert.equal(result.matches[0].score, 1);
+  assert.equal(result.matches[0].version, f.store.get("a.md").version);
   assert.deepEqual((await f.cache.search(query, { state: ["superseded"] })).matches.map((match) => match.id), ["b.md"]);
   assert.deepEqual((await f.cache.search(query, { scope: ["service:api"] })).matches.map((match) => match.id), ["a.md"]);
   assert.equal(readFileSync(join(f.config.cacheDirectory, "documents.json"), "utf8").includes(query), false);
