@@ -17,8 +17,8 @@ if (process.platform === "win32") {
   command = process.execPath;
   args.unshift(cli);
 }
-const installed = spawnSync(command, args, { stdio: "inherit", windowsHide: true });
+const installed = spawnSync(command, args, { stdio: "inherit", windowsHide: true, timeout: 120000 });
 if (installed.status !== 0) process.exit(installed.status || 1);
 const prepared = spawnSync(process.execPath, [join(plugin, "runtime", "rag", "run.mjs"), "prepare", process.cwd()],
-  { stdio: "inherit", windowsHide: true });
+  { stdio: "inherit", windowsHide: true, timeout: 150000 });
 process.exitCode = prepared.status ?? 1;

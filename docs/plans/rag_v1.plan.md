@@ -40,7 +40,7 @@ Ranges: `top_k` 1–20; `min_score` 0–1; `max_context_chars` 256–8000; `time
 
 Store the cache at `.geist/cache/rag/documents.json`. Keep the downloaded model in the prepared plugin's `models/` directory. Pin `Xenova/all-MiniLM-L6-v2` revision `751bff37182d3f1213fa05d7196b954e230abad9`, quantized ONNX, CPU execution, normalized mean pooling. Model, chunker, and cache schema changes invalidate embeddings.
 
-Ship bundled hooks, CLI, and MCP entry points. An explicit setup installs optional native/runtime dependencies and downloads the pinned model. Hooks and searches never invoke npm or download models. MCP starts without loading the model; non-search tools work before preparation.
+Ship bundled hooks, CLI, and MCP entry points. The explicit `prepare_runtime` MCP tool (or setup script) installs pinned native/runtime dependencies and downloads the pinned model. It verifies a real embedding, reuses prepared assets offline, shares concurrent preparation within one server, and allows search to recover without restarting MCP. Installer output stays off protocol stdout. Hooks and searches never invoke npm or download models. MCP starts without loading the model; record tools work before preparation. Preparation changes neither workspace configuration nor records.
 
 Codex loads root `plugin.json` and typed `mcp.json` using the Agent Plugins 1.0 schemas, so `${PLUGIN_ROOT}` resolves at installation/launch. Keep `.codex-plugin/plugin.json` as compatibility metadata and `.mcp.json` for Copilot. Legacy Codex MCP configuration does not expand the plugin-root placeholder; tests must exercise host loading, not only substitute an absolute path themselves.
 
@@ -94,6 +94,7 @@ The local stdio MCP server is named `geist`. Tools expose input schemas and stru
 
 | Tool | Input | Result |
 | --- | --- | --- |
+| prepare_runtime | No arguments | prepared, pinned model signature, embedding dimensions; initialization errors use model_unavailable |
 | list_records | Optional kind/state/scope lists, prefix, offset (0), limit (50, max 200) | Summaries sorted by ID, total, next offset, warnings |
 | get_record | id | ID, title, body, metadata, links, sources, raw Markdown, SHA-256 version |
 | search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked IDs, versions, titles, paths, scores, excerpts, warnings, refresh counts |
@@ -122,7 +123,7 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 
 The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its document cache and prepared model remain local and ignored by Git.
 
-Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and setup outside the checkout. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
+Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and a cold installed MCP server recovering from unavailable search through concurrent preparation calls without restarting. Repeated preparation succeeds without the setup script. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
 
 A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Hook adapter tests invoke the shipped commands; they do not establish interactive hook trust. The explicit `test:codex` integration test installs the package through Codex 0.153.4 and verifies MCP initialization through its app server from a separate workspace, with no model turn. This test reproduced the legacy manifest startup failure and passes with the portable manifests. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
 

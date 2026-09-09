@@ -5,12 +5,14 @@ import { readRagConfig, RagError } from "./config.ts";
 import { RecordStore, matches } from "./records.ts";
 import { DocumentCache } from "./cache.ts";
 import { createOnnxEmbedder, type Embedder } from "./embedding.ts";
+import { prepareRuntime } from "./setup.ts";
 
 export function createRagServer(workspace: string, embed: () => Promise<Embedder> = createOnnxEmbedder): McpServer {
   const store = new RecordStore(readRagConfig(workspace));
   const server = new McpServer({ name: "geist", version: "0.1.0" });
   let cache: DocumentCache | undefined;
   const getCache = async () => cache ??= new DocumentCache(store, await embed());
+  let preparation: ReturnType<typeof prepareRuntime> | undefined;
   const id = z.string().min(1).max(1024);
   const version = z.string().regex(/^[0-9a-f]{64}$/);
   const filters = {
@@ -30,6 +32,13 @@ export function createRagServer(workspace: string, embed: () => Promise<Embedder
       return { isError: true, content: [{ type: "text" as const, text: JSON.stringify(value) }], structuredContent: value };
     }
   }
+  server.registerTool("prepare_runtime", {
+    description: "Initialize local semantic search: install pinned ONNX Runtime from npm, download the pinned model from Hugging Face, and verify inference. Writes only to the installed plugin directory. Safe to repeat; already prepared installations work offline. May take several minutes on first use. Call this when search reports model_unavailable, then retry search without restarting MCP.",
+    inputSchema: {}, annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, () => result(async () => {
+    preparation ??= prepareRuntime(workspace).finally(() => { preparation = undefined; });
+    return preparation;
+  }));
   server.registerTool("list_records", {
     description: "List Markdown records and metadata. Includes all lifecycle states; filters match exact values.",
     inputSchema: { ...filters, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(200).default(50) }, annotations: readOnly,

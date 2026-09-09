@@ -96,14 +96,16 @@ timeout_ms = 4000
 
 `root` is relative to the project workspace; instruction-file paths remain relative to the TOML directory. Store your Markdown records under that root. YAML frontmatter is optional. Search automatically includes active records and records without a state; draft, proposed, deprecated, superseded, rejected, and unknown states require an explicit MCP filter.
 
-From the consuming project, run setup against the **installed plugin directory** reported by your host (replace `<installed-geist>`):
+Ask the agent to call Geist's `prepare_runtime` MCP tool. It installs the pinned ONNX runtime and model in the running plugin's directory and verifies a real embedding. Then call `rebuild_cache` for initial indexing, or search immediately. A failed search can be retried after preparation in the same MCP connection. Preparation is safe to repeat and works offline once ready; simultaneous calls share one setup. Allow up to five minutes for the first call if your MCP client has a configurable tool timeout.
+
+Alternatively, from the consuming project, run setup against the **installed plugin directory** reported by your host (replace `<installed-geist>`):
 
 ```powershell
 node "<installed-geist>/scripts/setup-rag.mjs"
 node "<installed-geist>/runtime/rag/run.mjs" index .
 ```
 
-Setup installs the pinned ONNX Runtime dependency and downloads the pinned quantized MiniLM model, about 23 MB plus tokenizer files. This is the only model-download step. Run it once for each new installed plugin snapshot. Both setup and indexing finish before hook execution; the hooks never install dependencies or download models.
+Explicit preparation installs the pinned ONNX Runtime dependency from npm and downloads the pinned quantized MiniLM model from Hugging Face, about 23 MB plus tokenizer files. Run it once for each new installed plugin snapshot. Hooks and searches never install dependencies or download models. Preparation does not enable workspace retrieval or create records.
 
 For this source checkout, `npm ci` already installs the runtime dependency. From the marketplace root:
 
@@ -140,10 +142,11 @@ Deleting `documents.json` is also safe; the next search recreates it. Locks from
 
 ### Record tools
 
-The plugin registers a local `geist` MCP server for both hosts. Codex loads the portable root `plugin.json` and typed `mcp.json`; Copilot uses its compatibility manifest and `.mcp.json`. Its workspace is the host process working directory, overridable with `GEIST_WORKSPACE_DIR`. The model is loaded only for search or rebuild.
+The plugin registers a local `geist` MCP server for both hosts. Codex loads the portable root `plugin.json` and typed `mcp.json`; Copilot uses its compatibility manifest and `.mcp.json`. Its workspace is the host process working directory, overridable with `GEIST_WORKSPACE_DIR`. The model is loaded only for preparation, search, or rebuild.
 
 | Tool | Purpose |
 | --- | --- |
+| `prepare_runtime` | Install the pinned runtime/model and verify local inference; safe to repeat. |
 | `list_records` | List and filter record metadata with offset/limit pagination. |
 | `get_record` | Read raw Markdown, metadata, and a version hash. |
 | `search_records` | Retrieve ranked document excerpts from the current corpus. |

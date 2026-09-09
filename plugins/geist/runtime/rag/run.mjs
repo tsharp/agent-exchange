@@ -11413,7 +11413,7 @@ async function createOnnxEmbedder() {
       }
     };
   } catch {
-    throw new RagError("model_unavailable", "Local ONNX model/runtime is unavailable. Run the Geist RAG setup and prepare commands first.");
+    throw new RagError("model_unavailable", "Local ONNX model/runtime is unavailable. Call the prepare_runtime MCP tool (or run scripts/setup-rag.mjs), then retry.");
   }
 }
 

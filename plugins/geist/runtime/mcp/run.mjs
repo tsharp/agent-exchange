@@ -2986,7 +2986,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve4.call(this, root, ref);
+      let _sch = resolve5.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a3 = root.localRefs) === null || _a3 === void 0 ? void 0 : _a3[ref];
         const { schemaId } = this.opts;
@@ -3013,7 +3013,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve4(root, ref) {
+    function resolve5(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3843,7 +3843,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve4(baseURI, relativeURI, options) {
+    function resolve5(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const {
         parsed: baseParsed,
@@ -4211,7 +4211,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve4,
+      resolve: resolve5,
       resolveComponent,
       equal,
       serialize,
@@ -40877,7 +40877,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
+        await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error61) {
@@ -40894,7 +40894,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       const earlyReject = (error61) => {
         reject(error61);
       };
@@ -40972,7 +40972,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve4(parseResult.data);
+            resolve5(parseResult.data);
           }
         } catch (error61) {
           reject(error61);
@@ -41233,12 +41233,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve4, interval);
+      const timeoutId = setTimeout(resolve5, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -42329,7 +42329,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
+      await new Promise((resolve5) => setTimeout(resolve5, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -42993,12 +42993,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve4) => {
+    return new Promise((resolve5) => {
       const json2 = serializeMessage(message);
       if (this._stdout.write(json2)) {
-        resolve4();
+        resolve5();
       } else {
-        this._stdout.once("drain", resolve4);
+        this._stdout.once("drain", resolve5);
       }
     });
   }
@@ -47323,8 +47323,48 @@ async function createOnnxEmbedder() {
       }
     };
   } catch {
-    throw new RagError("model_unavailable", "Local ONNX model/runtime is unavailable. Run the Geist RAG setup and prepare commands first.");
+    throw new RagError("model_unavailable", "Local ONNX model/runtime is unavailable. Call the prepare_runtime MCP tool (or run scripts/setup-rag.mjs), then retry.");
   }
+}
+
+// src/rag/setup.ts
+import { spawn } from "node:child_process";
+import { resolve as resolve4 } from "node:path";
+async function verify() {
+  const embedder = await createOnnxEmbedder();
+  try {
+    const [vector] = await embedder.embed(["Geist runtime verification"]);
+    if (!vector.length || !vector.every(Number.isFinite) || !vector.some((value) => value !== 0)) {
+      throw new RagError("model_unavailable", "ONNX verification returned an invalid embedding.");
+    }
+    return { prepared: true, model: embedder.signature, dimensions: vector.length };
+  } finally {
+    await embedder.dispose();
+  }
+}
+async function prepareRuntime(workspace) {
+  try {
+    return await verify();
+  } catch {
+  }
+  await new Promise((done, reject) => {
+    const child = spawn(process.execPath, [resolve4(MODEL_DIRECTORY, "../scripts/setup-rag.mjs")], {
+      cwd: workspace,
+      stdio: ["ignore", "ignore", "pipe"],
+      windowsHide: true,
+      timeout: 3e5
+    });
+    let diagnostic = "";
+    child.stderr.on("data", (chunk) => {
+      diagnostic = (diagnostic + chunk).slice(-2e3);
+    });
+    child.on("error", () => reject(new RagError("model_unavailable", "Could not start ONNX setup. Check Node.js and the installed Geist files.")));
+    child.on("close", (code) => code === 0 ? done() : reject(new RagError(
+      "model_unavailable",
+      `ONNX setup failed. Check npm, network access, and plugin directory permissions. ${diagnostic.trim()}`
+    )));
+  });
+  return verify();
 }
 
 // src/rag/server.ts
@@ -47333,6 +47373,7 @@ function createRagServer(workspace, embed = createOnnxEmbedder) {
   const server = new McpServer({ name: "geist", version: "0.1.0" });
   let cache;
   const getCache = async () => cache ??= new DocumentCache(store, await embed());
+  let preparation;
   const id = external_exports.string().min(1).max(1024);
   const version2 = external_exports.string().regex(/^[0-9a-f]{64}$/);
   const filters = {
@@ -47354,6 +47395,16 @@ function createRagServer(workspace, embed = createOnnxEmbedder) {
       return { isError: true, content: [{ type: "text", text: JSON.stringify(value) }], structuredContent: value };
     }
   }
+  server.registerTool("prepare_runtime", {
+    description: "Initialize local semantic search: install pinned ONNX Runtime from npm, download the pinned model from Hugging Face, and verify inference. Writes only to the installed plugin directory. Safe to repeat; already prepared installations work offline. May take several minutes on first use. Call this when search reports model_unavailable, then retry search without restarting MCP.",
+    inputSchema: {},
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+  }, () => result(async () => {
+    preparation ??= prepareRuntime(workspace).finally(() => {
+      preparation = void 0;
+    });
+    return preparation;
+  }));
   server.registerTool("list_records", {
     description: "List Markdown records and metadata. Includes all lifecycle states; filters match exact values.",
     inputSchema: { ...filters, offset: external_exports.number().int().min(0).default(0), limit: external_exports.number().int().min(1).max(200).default(50) },

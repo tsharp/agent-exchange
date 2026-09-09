@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 test("real ONNX ranks records and both prompt hooks inject bounded hints offline", (t) => {
   const workspace = mkdtempSync(join(tmpdir(), "geist-onnx-test-"));
@@ -78,7 +80,7 @@ test("real ONNX ranks records and both prompt hooks inject bounded hints offline
   console.log(`ONNX integration timings: ${JSON.stringify(timings)}`);
 });
 
-test("a copied plugin can prepare its own ONNX runtime and search outside the checkout", (t) => {
+test("a cold MCP installation prepares ONNX and recovers search without restarting", async (t) => {
   const directory = mkdtempSync(join(tmpdir(), "geist-prepared-test-"));
   t.after(() => {
     assert.ok(resolve(directory).startsWith(`${resolve(tmpdir())}${sep}geist-prepared-test-`));
@@ -95,11 +97,22 @@ test("a copied plugin can prepare its own ONNX runtime and search outside the ch
   writeFileSync(join(workspace, ".geist", "config.toml"), '[rag]\nenabled=true\nmin_score=0\n');
   writeFileSync(join(workspace, "docs", "transactions.md"), "# Storage\nPostgreSQL handles atomic transactions.");
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
-  const setup = spawnSync(process.execPath, [join(plugin, "scripts", "setup-rag.mjs")], { cwd: workspace, env, encoding: "utf8", timeout: 120000 });
-  assert.equal(setup.status, 0, setup.stderr || String(setup.error));
-  const search = spawnSync(process.execPath, [join(plugin, "runtime", "rag", "run.mjs"), "search", workspace, "Which database stores transactions?"], {
-    cwd: workspace, env, encoding: "utf8", timeout: 30000,
-  });
-  assert.equal(search.status, 0, search.stderr);
-  assert.equal(JSON.parse(search.stdout).matches[0].id, "transactions.md");
+  const transport = new StdioClientTransport({ command: process.execPath,
+    args: [join(plugin, "runtime/mcp/run.mjs")], cwd: workspace, env, stderr: "pipe" });
+  const client = new Client({ name: "cold-setup-test", version: "1.0.0" });
+  try {
+    await client.connect(transport);
+    const search = () => client.callTool({ name: "search_records", arguments: { query: "Which database stores transactions?" } });
+    assert.equal((await search()).structuredContent.error.code, "model_unavailable");
+    const prepare = () => client.callTool({ name: "prepare_runtime", arguments: {} }, undefined, { timeout: 300000 });
+    const [first, concurrent] = await Promise.all([prepare(), prepare()]);
+    assert.equal(first.isError, undefined, JSON.stringify(first));
+    assert.equal(first.structuredContent.prepared, true);
+    assert.equal(first.structuredContent.dimensions, 384);
+    assert.deepEqual(first.structuredContent, concurrent.structuredContent);
+    assert.equal((await search()).structuredContent.matches[0].id, "transactions.md");
+    // Prove warm preparation requires neither npm nor the setup script.
+    rmSync(join(plugin, "scripts/setup-rag.mjs"));
+    assert.deepEqual((await prepare()).structuredContent, first.structuredContent);
+  } finally { await client.close(); }
 });

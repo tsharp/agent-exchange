@@ -19,7 +19,7 @@ function workspace(t) {
   return path;
 }
 
-test("MCP round trips all eight tools with versions, filters, and structured errors", async (t) => {
+test("MCP exposes preparation and round trips record tools with versions, filters, and structured errors", async (t) => {
   const path = workspace(t);
   let loads = 0;
   const server = createRagServer(path, async () => {
@@ -35,7 +35,9 @@ test("MCP round trips all eight tools with versions, filters, and structured err
     const result = await client.callTool({ name, arguments: args });
     return { ...result.structuredContent, isError: result.isError };
   };
-  assert.equal((await client.listTools()).tools.length, 8);
+  const tools = (await client.listTools()).tools;
+  assert.equal(tools.length, 9);
+  assert.equal(tools.find((tool) => tool.name === "prepare_runtime").annotations.openWorldHint, true);
   assert.equal((await call("list_records")).total, 0);
   const created = await call("create_record", { id: "a.md", markdown: '---\nkind: fact\ncustom: kept\nlinks: [{record: b.md}]\n---\n# Database\nPostgres' });
   assert.equal(created.record.frontmatter.custom, "kept");
