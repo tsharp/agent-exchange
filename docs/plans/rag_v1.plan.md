@@ -78,6 +78,14 @@ Search defaults to active or omitted state. Explicit state filters can select an
 
 Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Never automatically fetch full bodies into the prompt. Automatic retrieval uses the first 4000 prompt characters. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
 
+### Session delivery
+
+For automatic hints, remember the last emitted version of each document within a host, workspace, record root, and session. Select the normal top_k results first, then suppress unchanged documents already emitted; do not fill the gaps with lower-ranked results. Mark only hints that fit the output budget. Changed documents and new sessions are eligible again. Explicit MCP/CLI search remains unaffected.
+
+Store only document IDs and version hashes in `.geist/cache/rag/sessions/`, using a hash of the host, record root, and session identity as the filename. No prompts, excerpts, conversation content, or raw session IDs enter this delivery state. Keep at most the latest 2000 document entries per session. Missing/corrupt state starts fresh. Without a session ID, retain stateless hints. SessionEnd removes the session's state; orphaned state can be deleted with the cache.
+
+Reset delivery state on fresh/cleared sessions and compaction, but preserve it on resume while it exists. Codex uses `SessionStart` with source `compact` or `clear`; Copilot uses `preCompact`. Copilot prompt hints use `userPromptTransformed` and preserve the original transformed prompt. Delivery runs after successful optional stages/controllers, so blocking or failed processing does not consume hints. Metadata records hook emission, not confirmation that the host or model consumed the hints.
+
 ## MCP and CLI
 
 The local stdio MCP server is named `geist`. Tools expose input schemas and structured JSON results plus matching text JSON. Domain errors return `isError`, a code, and message: invalid_config, invalid_id, invalid_record, not_found, already_exists, conflict, busy, model_unavailable, or io_error.
