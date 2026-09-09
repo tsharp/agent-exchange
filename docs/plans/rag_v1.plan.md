@@ -1,568 +1,113 @@
 ---
-state: draft
-version: 2026-09-08
+state: active
+version: 2026-09-09
 ---
-# Geist RAG
+# Geist RAG v1
 
-The purpose of this document is to describe minimally the features needed to implement RAG for Geist.
+This public plan records the implementation contract. The original draft is preserved in Git history. Conversation logging remains outside Geist's scope.
 
-## Data Storage
+## Outcome and flow
 
-Geist stores its knowledge as records within a configured directory.
+1. A workspace enables RAG in `.geist/config.toml` and prepares the local ONNX model once.
+2. Markdown files under the record root are canonical. Each file is a record identified by its root-relative path.
+3. Before search, scan and hash current files, embed changed documents, reuse unchanged embeddings, and remove deleted documents from a rebuildable cache.
+4. On every user prompt, automatically select up to `top_k` documents (default 3).
+5. Inject bounded, untrusted relevance hints: IDs, titles, source paths, scores, and excerpts. The agent decides whether to read full records through MCP or file tools. Preserve the separate, ordered TOML instruction flow.
+6. MCP exposes discovery, reads, search, writes, relationships, and cache rebuild. Mutations invalidate affected cache entries; the next search synchronizes before returning results.
 
-For the initial version, records are stored as Markdown files with optional YAML frontmatter. The filesystem is the canonical source of record data. Indexes, embeddings, relationship graphs, and other retrieval structures are derived from these files and may be rebuilt at any time.
+V1 uses local CPU ONNX inference, normalized embeddings, cosine ranking, deterministic chunks, and a JSON cache. ONNX computes embeddings; JSON stores derived documents and vectors. Reranking, hosted inference, background watchers, a persistent retrieval daemon, graph traversal, and automatic knowledge creation are deferred.
 
-### Storage Location
+## Configuration and installation
 
-The default record location is:
+```toml
+# .geist/config.toml
+[instructions]
+files = ["instructions.md", "architecture.md"]
 
-```text
-docs/
+[rag]
+enabled = true
+root = "docs"
+top_k = 3
+min_score = 0.25
+max_context_chars = 1800
+timeout_ms = 4000
 ```
 
-The storage location may be configured to use another directory.
+Both tables are optional. RAG is disabled by default. Instruction paths remain relative to the TOML directory. The record root is relative to the active workspace and must remain inside it. Existing `GEIST_CONFIG_FILE` and `GEIST_WORKSPACE_DIR` overrides apply.
 
-All Markdown files contained within the configured storage location, including files in subdirectories, are considered Geist records.
+Ranges: `top_k` 1–20; `min_score` 0–1; `max_context_chars` 256–8000; `timeout_ms` 100–4500. Unknown RAG keys fail validation. Disabled RAG performs no retrieval work.
 
-For example:
+Store the cache at `.geist/cache/rag/documents.json`. Keep the downloaded model in the prepared plugin's `models/` directory. Pin `Xenova/all-MiniLM-L6-v2` revision `751bff37182d3f1213fa05d7196b954e230abad9`, quantized ONNX, CPU execution, normalized mean pooling. Model, chunker, and cache schema changes invalidate embeddings.
 
-```text
-docs/
-  architecture.md
-  decisions/
-    use-postgres.md
-    service-boundaries.md
-  constraints/
-    database-access.md
-  checkout/
-    ownership.md
-```
+Ship bundled hooks, CLI, and MCP entry points. An explicit setup installs optional native/runtime dependencies and downloads the pinned model. Hooks and searches never invoke npm or download models. MCP starts without loading the model; non-search tools work before preparation.
 
-Directory structure has no intrinsic semantic meaning to Geist. Repositories may organize records into directories for human readability and navigation.
+## Records
 
-Semantics such as kind, state, scope, and relationships are expressed through record frontmatter rather than inferred from directory names.
+Default root: `docs/`. Recursively scan `.md` files, including hidden directories. Directory names have no semantic meaning. IDs use `/`, end in `.md`, and contain no empty, `.` or `..` components. Reject absolute paths, Windows alternate streams, and symlink/junction files or directories. Apply containment checks to discovery, reads, and writes. IDs compare case-sensitively; creation also respects filesystem collision rules.
 
-### Record Format
+Records are UTF-8 Markdown with optional YAML frontmatter at the beginning. Limits: 256 KiB per record and 2000 records per store. Exclude invalid records from scans with warnings; direct reads fail. A missing root lists as empty and can be created by the first write.
 
-Each Markdown file represents one record.
-
-A record consists of:
-
-1. Optional YAML frontmatter containing structured metadata.
-2. Markdown content containing the record's human-readable information.
-
-For example:
-
-```md
+```markdown
 ---
 kind: decision
 state: active
-scope:
-  - service:checkout
----
-
-# Checkout database ownership
-
-Checkout owns and controls modifications to its transactional data.
-```
-
-Frontmatter is optional. A Markdown file containing only Markdown content is a valid record.
-
-### Record Identity
-
-A record is identified by its path relative to the configured storage location.
-
-For example:
-
-```text
-docs/decisions/use-postgres.md
-```
-
-has the record identifier:
-
-```text
-decisions/use-postgres.md
-```
-
-Record paths must be unique within a storage location.
-
-Moving or renaming a file changes its record identifier. References to the previous path may therefore need to be updated.
-
-### Discovery
-
-Geist discovers records by recursively scanning the configured storage location.
-
-Files outside the configured location are not considered records.
-
-For the initial version, only Markdown files are indexed as records.
-
-Generated files, hidden files, or other exclusions may be introduced later if required. The initial implementation should avoid introducing exclusion rules unless they are necessary.
-
-### Canonical and Derived Data
-
-Markdown records are canonical.
-
-The following are considered derived data:
-
-- text chunks used for retrieval
-- embeddings
-- vector indexes
-- search indexes
-- relationship indexes
-- backlinks
-- caches
-- other RAG-specific representations
-
-Derived data may be stored locally or externally as required by an implementation, but it must be possible to recreate it from the canonical records.
-
-Deleting derived data must not result in the loss of record knowledge.
-
-### Source Control
-
-The storage directory is intended to work naturally with source control.
-
-Changes to records are ordinary file changes and may use the repository's existing branching, review, merge, and history mechanisms.
-
-This allows architectural knowledge, decisions, constraints, facts, and other records to evolve alongside the system they describe without requiring a separate persistence system.
-
-### Portability
-
-Records should not depend on Geist-specific storage infrastructure to remain useful.
-
-A repository containing its `docs/` directory should retain its human-readable knowledge even when Geist, its MCP server, its database, or its retrieval indexes are unavailable.
-
-This also allows the same record set to be indexed by different Geist implementations or retrieval systems in the future.
-
-## Frontmatter
-
-Markdown records may contain optional YAML frontmatter describing the record and its relationship to other knowledge.
-
-Frontmatter is intended to support classification, retrieval, filtering, relationship traversal, provenance, and agent reasoning. The Markdown body remains the primary content of the record.
-
-All frontmatter fields are optional. A Markdown file without frontmatter is a valid record.
-
-### Format
-
-Frontmatter appears at the beginning of a Markdown record between YAML delimiters.
-
-```md id="yky8r0"
----
-kind: decision
-state: active
-
-scope:
-  - service:checkout
-  - domain:commerce
-
+scope: ["service:checkout"]
 links:
   - record: constraints/database-ownership.md
     kind: supports
-
 sources:
-  - date: 2026-09-08
+  - date: "2026-09-08"
     source: "PR 1842"
 ---
-
-# Database access
-
-Services access data owned by other services through their public
-interfaces rather than directly accessing their underlying storage.
+# Checkout database ownership
+Checkout owns its transactional data.
 ```
 
-The supported top-level fields are:
+All metadata is optional. Frontmatter must be a mapping. `kind` and `state` are strings; `scope` is a string list. Links require root-relative `record` and allow string `kind`. Sources require string `source` and allow an ISO `YYYY-MM-DD` string `date`. Preserve unknown metadata and values. Mutation accepts complete raw Markdown, preserving YAML formatting and comments. Titles use the first H1, then the record ID.
 
-| Field | Type | Required | Purpose |
-|---|---|---:|---|
-| `kind` | string | No | Classifies the knowledge represented by the record. |
-| `state` | string | No | Describes the lifecycle state of the record. |
-| `scope` | list of strings | No | Identifies where the record applies. |
-| `links` | list of links | No | Defines relationships to other records. |
-| `sources` | list of sources | No | Records provenance and supporting information. |
+Recognized kinds: decision, fact, idea, constraint, preference, proposal, requirement, exception. Recognized states: draft, proposed, active, deprecated, superseded, rejected. No automatic lifecycle transitions or inferred relationship semantics. Broken links remain observable.
 
-Unknown fields should be preserved when possible. Readers should not reject a record solely because its frontmatter contains fields they do not understand.
+## Cache and retrieval
 
----
+Store parsed records, SHA-256 versions, chunks, and embeddings. Hash source bytes to detect even same-timestamp edits. Reuse unchanged documents. Renames are deletion plus creation. Missing, corrupt, or incompatible caches rebuild from records; explicit rebuild ignores cached embeddings. Publish snapshots atomically and serialize cooperating cache writers with a process lock. Busy or abandoned locks produce diagnostics instead of stale results. Cache deletion never changes records.
 
-### Kind
+Chunk the complete body into windows of at most 1000 characters with 150-character overlap, prefixing the title. Rank each document by its best chunk cosine score and use that chunk's excerpt. Sort by descending score, then ID. Queries are nonempty and at most 4000 characters. Query text and query embeddings are never persisted.
 
-`kind` describes what type of knowledge the record represents.
+Search defaults to active or omitted state. Explicit state filters can select any state; `include_inactive` allows all states. Kind/state/scope filters use exact strings, OR within a filter and AND across filters. Scopes imply no hierarchy. Listing includes all states.
 
-```yaml id="frkt8r"
-kind: decision
-```
+Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Never automatically inject full bodies. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
 
-The initial recognized values are:
+## MCP and CLI
 
-| Kind | Meaning |
-|---|---|
-| `decision` | A choice that has been made and is relevant to future work. |
-| `fact` | Something currently understood to be true. |
-| `idea` | Something worth remembering, investigating, or developing further. |
-| `constraint` | A restriction that must or must not be violated. |
-| `preference` | An approach that should generally be favored when practical. |
-| `proposal` | A concrete change or approach being considered. |
-| `requirement` | Something the system, design, or implementation must satisfy. |
-| `exception` | A scoped exception to another decision, constraint, requirement, or convention. |
+The local stdio MCP server is named `geist`. Tools expose input schemas and structured JSON results plus matching text JSON. Domain errors return `isError`, a code, and message: invalid_config, invalid_id, invalid_record, not_found, already_exists, conflict, busy, model_unavailable, or io_error.
 
-`kind` describes semantics, not lifecycle.
+| Tool | Input | Result |
+| --- | --- | --- |
+| list_records | Optional kind/state/scope lists, prefix, offset (0), limit (50, max 200) | Summaries sorted by ID, total, next offset, warnings |
+| get_record | id | ID, title, body, metadata, links, sources, raw Markdown, SHA-256 version |
+| search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked IDs, titles, paths, scores, excerpts, warnings, refresh counts |
+| create_record | id, complete raw markdown | Created record and cache invalidation status; existing files fail |
+| update_record | id, complete raw markdown, expected_version | Updated record; missing or changed records fail |
+| delete_record | id, expected_version | Deleted ID and cache invalidation status |
+| get_links | id | Incoming/outgoing edges with source, target, optional kind, resolved status |
+| rebuild_cache | No arguments | Refresh counts and warnings |
 
-For example, a decision may be proposed, active, rejected, or superseded.
+Updates replace the complete document. Read first, retain unknown metadata, and supply its version hash. Write temporary sibling files and publish atomically; create exclusively. Serialize cooperating writers. Version checks detect intervening edits but cannot prevent an external editor racing in the final check/publication interval. Deletion leaves other records and unresolved links intact. Git operations remain external.
 
-The recognized vocabulary may expand over time. Consumers should tolerate unknown kinds.
+CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when launched outside the consuming project.
 
----
+## Acceptance criteria
 
-### State
+- Ordered static instructions still work on both hosts, with no conversation capture.
+- Each configured prompt receives up to three configurable document hints within execution and text budgets.
+- A real local ONNX run demonstrates semantic retrieval.
+- Cache tests cover reuse, changes, deletions, renames, corruption, model/schema invalidation, rebuild, and no prompt persistence.
+- MCP tests cover tools, schemas, metadata preservation, filters, backlinks, conflicts, and containment.
+- Copied bundles run outside the checkout; prepared retrieval runs offline. Static hooks and non-search tools need no model dependency.
+- Commit source, generated bundles, docs, and this plan in tested Conventional Commit increments.
 
-`state` describes the current lifecycle state of the record.
+## References
 
-```yaml id="3p7kav"
-state: active
-```
-
-The initial recognized values are:
-
-| State | Meaning |
-|---|---|
-| `draft` | The record is incomplete or still being developed. |
-| `proposed` | The record is ready for consideration but has not been accepted. |
-| `active` | The record currently applies. |
-| `deprecated` | The record remains relevant but should not normally guide new work. |
-| `superseded` | The record has been replaced by another record. |
-| `rejected` | The record was considered and explicitly not adopted. |
-
-State is independent of kind.
-
-An omitted state means that the record makes no explicit lifecycle assertion.
-
-Consumers should tolerate unknown states.
-
----
-
-### Scope
-
-`scope` identifies where the record applies.
-
-```yaml id="sjs2fm"
-scope:
-  - service:checkout
-  - domain:commerce
-```
-
-A record may have zero or more scopes.
-
-Scope values are strings. Geist does not require a fixed scope schema. This allows repositories and higher-level tooling to establish conventions without changing the record format.
-
-Recommended conventions include:
-
-| Scope | Meaning |
-|---|---|
-| `global` | Applies broadly across the system or repository. |
-| `repo:<name>` | Applies to a repository. |
-| `path:<path>` | Applies to a file or directory hierarchy. |
-| `component:<name>` | Applies to a logical component. |
-| `service:<name>` | Applies to a service. |
-| `domain:<name>` | Applies to a business or architectural domain. |
-
-For example:
-
-```yaml id="pm5j8b"
-scope:
-  - repo
-
-## MCP Server
-
-Geist exposes its record system through an MCP server so agents can discover, retrieve, create, update, relate, and remove records using the same underlying storage model.
-
-The MCP server is an operational interface over the configured record store. It does not define a separate source of truth. Markdown records under the configured storage location remain canonical.
-
-The MCP server should remain intentionally small. Retrieval, mutation, and relationship operations are exposed directly. Higher-level behaviors such as architectural review, design analysis, policy enforcement, or software-factory workflows should be implemented by agents or specialized components built on top of these primitives.
-
-### Responsibilities
-
-The MCP server is responsible for:
-
-- discovering records
-- retrieving records
-- searching records
-- creating records
-- updating records
-- deleting records
-- resolving relationships between records
-- exposing record metadata
-- allowing agents to work with records without directly manipulating the filesystem
-
-The MCP server may use indexes, embeddings, vector search, relationship indexes, caches, or other derived structures internally.
-
-These structures are implementation details and must remain rebuildable from the canonical record store.
-
-### Record Identity
-
-Records are identified by their path relative to the configured storage location.
-
-For example:
-
-```text
-docs/decisions/use-postgres.md
-```
-
-is addressed through MCP as:
-
-```text
-decisions/use-postgres.md
-```
-
-All MCP operations that reference a record should use this relative record identifier.
-
-### Core Tools
-
-The initial MCP server should expose the following tools.
-
-#### `list_records`
-
-Returns records available in the configured record store.
-
-The operation may optionally support filtering by:
-
-- `kind`
-- `state`
-- `scope`
-- path prefix
-
-The result should include enough information to identify each record without returning the full body unless requested.
-
-Typical returned information includes:
-
-- record identifier
-- title, when available
-- kind
-- state
-- scope
-
-#### `get_record`
-
-Retrieves a single record by identifier.
-
-The result should include:
-
-- record identifier
-- Markdown body
-- parsed frontmatter
-- links
-- sources
-
-The raw Markdown representation may also be returned when useful.
-
-#### `search_records`
-
-Searches the record corpus.
-
-Search may combine:
-
-- semantic/vector retrieval
-- text search
-- metadata filtering
-- scope filtering
-- relationship context
-
-The implementation determines the retrieval strategy.
-
-The result should return ranked record matches and enough context for an agent to decide which records should be retrieved in full.
-
-Search results should preserve record identity so agents can subsequently call `get_record`.
-
-#### `create_record`
-
-Creates a new record.
-
-The caller supplies:
-
-- record identifier or desired path
-- Markdown content
-- optional frontmatter
-
-The MCP server writes the resulting Markdown file into the configured record store.
-
-Creation must fail if the requested identifier already exists unless explicit replacement semantics are introduced later.
-
-#### `update_record`
-
-Updates an existing record.
-
-Updates may modify:
-
-- Markdown content
-- frontmatter
-- links
-- sources
-
-The initial implementation may replace the complete record rather than supporting fine-grained patch operations.
-
-After modification, any derived indexes associated with the record should be refreshed.
-
-#### `delete_record`
-
-Removes a record from the canonical store.
-
-Deleting a record should also remove or invalidate its derived indexing data.
-
-The server should not automatically delete records that link to the removed record. Existing links may become unresolved and should remain observable.
-
-Higher-level workflows may choose to use lifecycle states such as `superseded` or `rejected` instead of physical deletion.
-
-#### `get_links`
-
-Returns relationships involving a record.
-
-The operation should expose:
-
-- outgoing links declared by the record
-- incoming links or backlinks derived from other records
-
-Each relationship should identify:
-
-- source record
-- target record
-- relationship kind, when present
-
-Backlinks are derived data and do not need to be written into Markdown records.
-
-### Optional Convenience Tools
-
-The following operations may be added if they materially simplify agent usage, but they are not required for the first implementation.
-
-#### `add_source`
-
-Adds a dated source entry to an existing record without requiring the caller to replace the entire record.
-
-#### `add_link`
-
-Adds a relationship from one record to another.
-
-#### `remove_link`
-
-Removes an existing relationship.
-
-#### `set_state`
-
-Changes the lifecycle state of a record.
-
-These are convenience operations over `update_record` and should not introduce different persistence semantics.
-
-### Search Behavior
-
-Search is intended primarily for RAG and agent context discovery.
-
-The search implementation may use embeddings and other indexes, but the MCP contract should not expose the underlying embedding model or vector representation as part of normal operation.
-
-Agents search for records, not vectors.
-
-A search result should favor useful record-level context over arbitrary text fragments. If indexing operates on chunks internally, every result must retain the identity of the canonical record from which the chunk originated.
-
-Metadata such as `kind`, `state`, and `scope` should be available as optional filters.
-
-For example, an agent may conceptually request:
-
-- active constraints related to database access
-- decisions affecting checkout
-- facts related to a particular component
-- proposals related to an existing decision
-
-The exact ranking behavior may evolve independently of the MCP interface.
-
-### Relationships
-
-Relationships are defined through record `links`.
-
-The MCP server should resolve these links and make them queryable without requiring agents to manually scan the corpus.
-
-The relationship graph is derived from canonical frontmatter.
-
-The server may additionally provide backlinks and relationship traversal as derived functionality.
-
-Unknown relationship kinds must be preserved and returned to callers.
-
-### Mutation and Indexing
-
-When a record is created, updated, or deleted, the MCP server should update or invalidate the corresponding derived data.
-
-The implementation may perform this immediately or lazily, provided callers do not receive silently stale results once synchronization is complete.
-
-For the initial local implementation, rebuilding or refreshing indexes after mutations is acceptable.
-
-The MCP contract should not depend on how indexing is performed.
-
-### Filesystem Safety
-
-All record mutations must remain within the configured storage location.
-
-Record identifiers must not allow path traversal outside that location.
-
-The server should reject identifiers that resolve outside the configured record root.
-
-The MCP server should avoid modifying files outside the record store.
-
-### Source Control
-
-The MCP server operates on files in the working tree.
-
-It does not own source-control operations.
-
-Creating or updating a record changes the corresponding Markdown file. Git or another source-control system is responsible for:
-
-- branches
-- commits
-- authorship
-- review
-- merge
-- rollback
-- history
-
-Agents using the MCP server may operate inside broader workflows that perform source-control operations, but those operations are outside the responsibility of this component.
-
-### Concurrency
-
-The initial implementation may assume a local working copy with relatively low write concurrency.
-
-The server should avoid corrupting records when concurrent operations occur, but distributed locking or multi-user transactional semantics are not required for the first version.
-
-If Geist later uses a shared remote record store, stronger concurrency semantics may be introduced without changing the basic MCP record model.
-
-### Configuration
-
-The MCP server should support a configurable record root.
-
-The default is:
-
-```text
-docs/
-```
-
-The server should resolve all record operations relative to this root.
-
-Other runtime configuration, such as embedding models, database paths, or indexing settings, belongs to the implementation and should not become part of the record format.
-
-### Design Principle
-
-The MCP server exposes records, not Geist internals.
-
-Agents should reason in terms of:
-
-- records
-- content
-- metadata
-- relationships
-- search
-- lifecycle
-
-They should not need to understand:
-
-- SQLite schemas
-- embedding vectors
-- chunk indexes
-- ANN implementations
-- cache formats
-- filesystem traversal
-- parser internals
-
-This keeps the MCP contract stable while allowing the underlying RAG and storage implementation to evolve independently.
+- [Transformers.js](https://huggingface.co/docs/transformers.js/v3.8.1/index): tokenization and ONNX feature extraction.
+- [ONNX Runtime](https://onnxruntime.ai/docs/get-started/with-javascript/node.html): local inference.
+- [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools): schemas and structured results.
