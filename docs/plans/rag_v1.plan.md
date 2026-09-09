@@ -135,4 +135,5 @@ A search for “How does Geist update or rebuild cached documents?” retrieves 
 - [ONNX Runtime](https://onnxruntime.ai/docs/get-started/with-javascript/node.html): local inference.
 - [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools): schemas and structured results.
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks): session identity and post-compaction SessionStart.
+- [Codex 0.153.4 plugin loader](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core-plugins/src/loader.rs#L954): the released host skips hook sources for portable `AgentPlugin` manifests, despite the broader documented contract.
 - [Copilot hooks](https://docs.github.com/en/copilot/reference/hooks-reference): transformed prompts and preCompact notifications.

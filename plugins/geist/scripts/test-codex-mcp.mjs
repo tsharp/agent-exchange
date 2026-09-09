@@ -108,4 +108,3 @@ test("Codex installs Geist, initializes MCP, and discovers removable compatibili
     });
   }
 });
-
