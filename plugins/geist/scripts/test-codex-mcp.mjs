@@ -17,7 +17,7 @@ test("Codex installs Geist, initializes MCP, and discovers removable compatibili
     assert.ok(resolve(directory).startsWith(`${resolve(tmpdir())}${sep}geist-codex-mcp-`));
     rmSync(directory, { recursive: true, force: true });
   });
-  for (const entry of [".codex-plugin", ".mcp.json", "plugin.json", "mcp.json", "runtime", "skills", "hooks", "scripts"]) {
+  for (const entry of [".codex-plugin", ".mcp.json", "plugin.json", "mcp.json", "package.json", "runtime", "skills", "hooks", "scripts"]) {
     if (existsSync(resolve(entry))) cpSync(resolve(entry), join(plugin, entry), { recursive: true });
   }
   writeFileSync(join(marketplace, ".agents", "plugins", "marketplace.json"), JSON.stringify({

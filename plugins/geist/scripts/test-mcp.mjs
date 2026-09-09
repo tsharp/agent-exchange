@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import test from "node:test";
@@ -30,6 +30,7 @@ test("MCP exposes preparation and round trips record tools with versions, filter
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   await client.connect(clientTransport);
+  assert.equal(client.getServerVersion().version, JSON.parse(readFileSync(resolve("package.json"), "utf8")).version);
   t.after(async () => { await client.close(); await server.close(); });
   const call = async (name, args = {}) => {
     const result = await client.callTool({ name, arguments: args });
@@ -70,10 +71,12 @@ test("copied MCP bundle starts and edits records without node_modules or models"
   const plugin = join(path, "installed Geist");
   mkdirSync(plugin);
   cpSync(resolve("runtime"), join(plugin, "runtime"), { recursive: true });
+  writeFileSync(join(plugin, "package.json"), JSON.stringify({ name: "geist", version: "9.8.7" }));
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
   const transport = new StdioClientTransport({ command: process.execPath, args: [join(plugin, "runtime", "mcp", "run.mjs")], cwd: path, env, stderr: "pipe" });
   client = new Client({ name: "installed-test", version: "1.0.0" });
   await client.connect(transport);
+  assert.equal(client.getServerVersion().version, "9.8.7", "installed version changes need no rebuild");
   const result = await client.callTool({ name: "create_record", arguments: { id: "hello.md", markdown: "# Hello" } });
   assert.equal(result.structuredContent.record.title, "Hello");
   const search = await client.callTool({ name: "search_records", arguments: { query: "hello" } });

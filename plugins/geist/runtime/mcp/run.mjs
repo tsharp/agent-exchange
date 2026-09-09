@@ -47368,9 +47368,11 @@ async function prepareRuntime(workspace) {
 }
 
 // src/rag/server.ts
+import { readFileSync as readFileSync6 } from "node:fs";
+var pluginVersion = JSON.parse(readFileSync6(new URL("../../package.json", import.meta.url), "utf8")).version;
 function createRagServer(workspace, embed = createOnnxEmbedder) {
   const store = new RecordStore(readRagConfig(workspace));
-  const server = new McpServer({ name: "geist", version: "0.1.0" });
+  const server = new McpServer({ name: "geist", version: pluginVersion });
   let cache;
   const getCache = async () => cache ??= new DocumentCache(store, await embed());
   let preparation;

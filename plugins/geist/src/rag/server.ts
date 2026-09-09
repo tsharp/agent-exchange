@@ -6,10 +6,13 @@ import { RecordStore, matches } from "./records.ts";
 import { DocumentCache } from "./cache.ts";
 import { createOnnxEmbedder, type Embedder } from "./embedding.ts";
 import { prepareRuntime } from "./setup.ts";
+import { readFileSync } from "node:fs";
+
+const pluginVersion = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version as string;
 
 export function createRagServer(workspace: string, embed: () => Promise<Embedder> = createOnnxEmbedder): McpServer {
   const store = new RecordStore(readRagConfig(workspace));
-  const server = new McpServer({ name: "geist", version: "0.1.0" });
+  const server = new McpServer({ name: "geist", version: pluginVersion });
   let cache: DocumentCache | undefined;
   const getCache = async () => cache ??= new DocumentCache(store, await embed());
   let preparation: ReturnType<typeof prepareRuntime> | undefined;

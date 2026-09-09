@@ -69,6 +69,20 @@ Implementation plans are public under `docs/plans/`, starting with the [Geist RA
 
 Keep each plugin's name, version, and shared metadata consistent between its Codex and Copilot manifests.
 
+Use PowerShell 7 to bump a plugin by name:
+
+```powershell
+./bump-plugin-version.ps1 geist patch
+./bump-plugin-version.ps1 geist minor
+./bump-plugin-version.ps1 geist major
+# Preview without changing files:
+./bump-plugin-version.ps1 -PluginName geist -Bump minor -WhatIf
+```
+
+Patch increments patch; minor increments minor and resets patch; major increments major and resets minor and patch. The script accepts stable `major.minor.patch` versions and validates agreement before writing. It updates existing plugin manifests, the plugin's `package.json`, local npm lockfiles, and matching workspace entries in the repository's npm lockfiles. Dependency versions and other plugins remain unchanged. Run it from any working directory; paths are resolved from the script's location. Geist's MCP server reads its package version at startup, so a version-only bump needs no runtime rebuild.
+
+Run `npm run test:version` to check the bump script with isolated plugin fixtures (requires PowerShell 7).
+
 To add another plugin, create `plugins/<plugin-name>/` with its own `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`, then register it in both marketplace catalogs using `./plugins/<plugin-name>` as the source. Add its README and an entry to the plugin table above. Keep its components inside that directory and configure them using each host's supported discovery and manifest conventions. Skills are optional; plugins can provide different combinations of components.
 
 Repository tooling requires Node.js 22.18 or later. Install development dependencies and run the marketplace and plugin checks:
