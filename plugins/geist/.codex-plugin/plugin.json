@@ -11,6 +11,7 @@
   "license": "MIT",
   "keywords": ["agent-skills", "hooks", "productivity"],
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Geist",
     "shortDescription": "Use Geist in Codex.",

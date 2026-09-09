@@ -76,7 +76,7 @@ Chunk the complete body into windows of at most 1000 characters with 150-charact
 
 Search defaults to active or omitted state. Explicit state filters can select any state; `include_inactive` allows all states. Kind/state/scope filters use exact strings, OR within a filter and AND across filters. Scopes imply no hierarchy. Listing includes all states.
 
-Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Never automatically inject full bodies. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
+Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Never automatically fetch full bodies into the prompt. Automatic retrieval uses the first 4000 prompt characters. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
 
 ## MCP and CLI
 

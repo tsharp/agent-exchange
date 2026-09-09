@@ -8,7 +8,7 @@ Each plugin lives under `plugins/<plugin-name>/` and can contain its own skills,
 
 | Plugin | Description | Documentation |
 | --- | --- | --- |
-| Geist | Lifecycle hooks, workspace instructions, and optional external controllers | [Installation, configuration, and usage](./plugins/geist/README.md) |
+| Geist | Ordered workspace instructions, local ONNX document retrieval, and Markdown-record tools | [Installation, configuration, and usage](./plugins/geist/README.md) |
 
 ## Register the marketplace
 
@@ -64,6 +64,8 @@ plugins/
 Marketplace source paths are relative to the repository root. Component paths in a plugin manifest are relative to that plugin's directory.
 
 ## Develop
+
+Implementation plans are public under `docs/plans/`, starting with the [Geist RAG v1 plan](./docs/plans/rag_v1.plan.md). Follow [the contributor instructions](./AGENTS.md), including Conventional Commits for tested increments of progress.
 
 Keep each plugin's name, version, and shared metadata consistent between its Codex and Copilot manifests.
 

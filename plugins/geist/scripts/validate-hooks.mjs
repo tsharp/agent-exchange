@@ -16,6 +16,11 @@ assert.equal(copilot.version, packageJson.version);
 assert.equal(codex.hooks, undefined, "Codex discovers the default hooks/hooks.json");
 assert.equal(copilot.hooks, "hooks/copilot-hooks.json");
 assert.ok(statSync(resolve(root, "runtime/hooks/run.mjs")).isFile());
+assert.ok(statSync(resolve(root, "runtime/rag/run.mjs")).isFile());
+assert.ok(statSync(resolve(root, "runtime/mcp/run.mjs")).isFile());
+assert.equal(codex.mcpServers, "./.mcp.json");
+assert.equal(copilot.mcpServers, ".mcp.json");
+assert.deepEqual(readJson(".mcp.json"), { mcpServers: { geist: { command: "node", args: ["${PLUGIN_ROOT}/runtime/mcp/run.mjs"] } } });
 
 for (const host of ["codex", "copilot"]) {
   const config = readJson(host === "codex" ? "hooks/hooks.json" : copilot.hooks);

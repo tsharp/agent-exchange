@@ -1,6 +1,6 @@
 # Geist hook reference
 
-Geist bundles six lifecycle hooks, workspace instruction loading, and an optional external controller. The implementation was ported from `tsharp/geist` at commit `4e35040` (`C:/workspaces/ai_tools/geist`), with conversation capture removed.
+Geist bundles six lifecycle hooks, ordered workspace instructions, automatic document retrieval, and an optional external controller. Its original hooks were ported from `tsharp/geist` at commit `4e35040`, with conversation capture removed.
 
 For installation, project setup, and environment variables, see [Geist configuration and usage](../README.md).
 
@@ -19,9 +19,11 @@ Host contracts are documented in the [Codex hook documentation](https://learn.ch
 
 ## Processing order
 
-The runner normalizes the host payload, loads workspace instructions, runs any in-process stages, and calls the optional external controller. It then emits one JSON object using the host's output format. A block decision stops the remaining pipeline stages. The runtime does not write conversation logs.
+The runner normalizes the host payload, loads configured workspace instructions at startup events, runs automatic RAG on user prompts when enabled, runs additional in-process stages, and calls the optional external controller. It then emits one JSON object using the host's output format. A block decision stops the remaining pipeline stages. The runtime does not write conversation logs.
 
 Workspace instructions are injected only at `SessionStart` and `SubagentStart`. See [workspace configuration](../README.md#configure-workspace-instructions) for file selection and override behavior.
+
+The built-in RAG stage searches through a subprocess with a configured deadline, returns bounded document hints, and fails open. Its model is prepared outside hook execution. See [document retrieval](../README.md#enable-document-retrieval). The optional `ragContextStage` helper remains available for custom in-process retrievers; the default flow requires no custom controller or pipeline definition.
 
 ## External controller protocol
 

@@ -149,3 +149,4 @@ target/
 .geist/cache/
 .geist/plans/
 .geist/*.plan.md
+plugins/*/models/
