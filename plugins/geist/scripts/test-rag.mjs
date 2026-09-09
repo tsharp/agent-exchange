@@ -3,9 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, s
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readRagConfig } from "../src/rag/config.ts";
 import { RecordStore, parseRecord, matches } from "../src/rag/records.ts";
 import { DocumentCache } from "../src/rag/cache.ts";
+import { withLock } from "../src/rag/files.ts";
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "geist-rag-test-"));
@@ -39,10 +42,41 @@ test("record writes preserve raw metadata and enforce version checks", async (t)
   assert.throws(() => store.get(created.id), { code: "not_found" });
 });
 
+test("version hashes preserve BOM bytes and invalid UTF-8 is rejected", async (t) => {
+  const { store } = fixture(t);
+  const raw = "\uFEFF---\nkind: fact\n---\n# Unicode\nCafé";
+  const created = await store.write("unicode.md", raw);
+  const record = store.get(created.id);
+  assert.equal(record.markdown, raw);
+  assert.equal(record.version, createHash("sha256").update(Buffer.from(raw)).digest("hex"));
+  assert.equal(record.version, created.version);
+  writeFileSync(store.path(created.id), Buffer.from([0xff, 0xfe]));
+  assert.throws(() => store.get(created.id), { code: "invalid_record" });
+  assert.equal(store.scan().warnings.length, 1);
+});
+
+test("live and recovering locks stay exclusive and dead worker locks are reclaimed", async (t) => {
+  const { config } = fixture(t);
+  await withLock(config, "index", async () => {
+    await assert.rejects(withLock(config, "index", () => assert.fail("must not enter")), { code: "busy" });
+  });
+  const dead = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" });
+  assert.equal(dead.status, 0);
+  const path = join(config.cacheDirectory, "index.lock");
+  writeFileSync(path, JSON.stringify({ pid: Number(dead.stdout) }));
+  writeFileSync(`${path}.reclaim`, "");
+  await assert.rejects(withLock(config, "index", () => assert.fail("must not enter")), { code: "busy" });
+  assert.equal(existsSync(path), true);
+  unlinkSync(`${path}.reclaim`);
+  assert.equal(await withLock(config, "index", () => "recovered"), "recovered");
+  assert.equal(existsSync(path), false);
+  assert.equal(existsSync(`${path}.reclaim`), false);
+});
+
 test("frontmatter validates shapes and retains unknown values", () => {
   assert.equal(parseRecord("a.md", "# Plain").title, "Plain");
   assert.equal(parseRecord("a.md", '---\nstate: future\n---\nbody').frontmatter.state, "future");
-  for (const yaml of ["scope: 12", "links: [{kind: supports}]", "sources: [{source: x, date: '2026-02-31'}]", "kind: [x]", "[one, two]"]) {
+  for (const yaml of ["scope: 12", "links: [{kind: supports}]", "sources: [{source: x, date: '2026-02-31'}]", "kind: [x]", "[one, two]", "custom: &cycle {self: *cycle}"]) {
     assert.throws(() => parseRecord("a.md", `---\n${yaml}\n---\nbody`));
   }
   const record = parseRecord("a.md", '---\nkind: fact\nscope: ["path:src", "service:api"]\n---\nbody');

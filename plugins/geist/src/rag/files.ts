@@ -21,17 +21,24 @@ export async function withLock<T>(config: RagConfig, name: string, action: () =>
   try { descriptor = openSync(path, "wx"); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    let abandoned = false;
+    // Only one contender may inspect and reclaim a dead owner's lock at a time.
+    const reclaim = safePath(config.workspace, `${path}.reclaim`);
+    let guard: number;
+    try { guard = openSync(reclaim, "wx"); }
+    catch { throw new RagError("busy", `Geist ${name} lock recovery is busy; retry or inspect the recovery file`); }
     try {
-      const { pid } = JSON.parse(readFileSync(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0) {
-        try { process.kill(pid, 0); }
-        catch (probe) { abandoned = (probe as NodeJS.ErrnoException).code === "ESRCH"; }
-      }
-    } catch { /* An incomplete lock can belong to a writer that is starting. */ }
-    if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
-    try { unlinkSync(path); descriptor = openSync(path, "wx"); }
-    catch { throw new RagError("busy", `Geist ${name} lock changed; retry`); }
+      let abandoned = false;
+      try {
+        const { pid } = JSON.parse(readFileSync(path, "utf8"));
+        if (Number.isInteger(pid) && pid > 0) {
+          try { process.kill(pid, 0); }
+          catch (probe) { abandoned = (probe as NodeJS.ErrnoException).code === "ESRCH"; }
+        }
+      } catch { /* An incomplete lock can belong to a writer that is starting. */ }
+      if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
+      try { unlinkSync(path); descriptor = openSync(path, "wx"); }
+      catch { throw new RagError("busy", `Geist ${name} lock changed; retry`); }
+    } finally { closeSync(guard); unlinkSync(reclaim); }
   }
   try {
     writeFileSync(descriptor, JSON.stringify({ pid: process.pid }));

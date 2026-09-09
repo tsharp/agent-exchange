@@ -40,6 +40,7 @@ export function parseRecord(id: string, markdown: string): RecordData {
       const parsed: unknown = document.toJS({ maxAliasCount: 50 });
       if (!object(parsed)) throw new Error("Frontmatter must be a mapping");
       frontmatter = parsed;
+      JSON.stringify(frontmatter); // Circular YAML aliases cannot cross the JSON cache/MCP boundary.
     } catch { throw new RagError("invalid_record", "Invalid YAML frontmatter mapping"); }
     body = body.slice(match[0].length);
   }
@@ -80,7 +81,13 @@ export class RecordStore {
     const path = this.path(id);
     try {
       if (!statSync(path).isFile() || statSync(path).size > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record is not a file or exceeds 256 KiB");
-      return parseRecord(id, new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(path)));
+      let markdown: string;
+      try { markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(path)); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ERR_ENCODING_INVALID_ENCODED_DATA") throw new RagError("invalid_record", "Record must contain valid UTF-8");
+        throw error;
+      }
+      return parseRecord(id, markdown);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new RagError("not_found", `Record not found: ${id}`);
       throw error;

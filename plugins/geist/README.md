@@ -128,7 +128,7 @@ node "<installed-geist>/runtime/rag/run.mjs" index .
 node "<installed-geist>/runtime/rag/run.mjs" rebuild .
 ```
 
-Deleting `documents.json` is also safe; the next search recreates it. Locks from a terminated worker are reclaimed when its PID is no longer alive. If a malformed lock persists after a crash, stop the relevant Geist process and remove that lock before retrying. Initial indexing or large corpora can exceed the prompt deadline; use the explicit index command first. V1 supports up to 2000 Markdown files, each at most 256 KiB.
+Deleting `documents.json` is also safe; the next search recreates it. Locks from a terminated worker are reclaimed when its PID is no longer alive. If a malformed lock or `.lock.reclaim` file persists after a crash, stop the relevant Geist processes and remove that file before retrying. Initial indexing or large corpora can exceed the prompt deadline; use the explicit index command first. V1 supports up to 2000 Markdown files, each at most 256 KiB.
 
 ### Record tools
 
@@ -157,7 +157,7 @@ A controller can select named local skills, supply reference context, or request
 $env:GEIST_HOOK_CONTROLLER = '{"command":"node","args":["C:/agent-control/controller.mjs"],"events":["UserPromptSubmit","Stop"],"required":false,"timeoutMs":4000}'
 ```
 
-Replace the example path with your controller. No controller runs when the variable is unset. Optional controller failures log a diagnostic and allow processing to continue; `required: true` makes controller failures fail the hook.
+Replace the example path with your controller. No controller runs when the variable is unset. Optional controller failures log a diagnostic and allow processing to continue; `required: true` makes controller failures fail the hook. When combining prompt retrieval with a controller, keep their combined deadlines below the host's five-second hook timeout; for example, configure each for 2000 ms.
 
 See the [hook reference](./hooks/README.md#external-controller-protocol) for the input/output protocol, skill lookup, time limits, and continuation rules.
 
@@ -182,7 +182,7 @@ src/hooks/                 # TypeScript implementation
 runtime/hooks/run.mjs      # Committed standalone runtime
 runtime/rag/run.mjs        # ONNX setup, indexing, and search CLI
 runtime/mcp/run.mjs        # Bundled stdio record server
-src/rag/                  # Record store, document cache, and ONNX retrieval
+src/rag/                   # Record store, document cache, and ONNX retrieval
 scripts/                   # Build, validation, and tests
 skills/                    # Plugin-owned skill sources
 ```
@@ -197,4 +197,6 @@ npm test
 
 Commit the generated runtime together with its source. Geist's checks type-check the source, reject stale bundles, validate all twelve host mappings, and test behavior from an isolated installation without npm dependencies. See the [hook reference](./hooks/README.md) for implementation details and the [skills guide](./skills/README.md) for adding skills.
 
-After preparing the model, run `npm run test:onnx --workspace plugins/geist` from the marketplace root for real inference and both prompt adapters. This test uses a temporary four-document corpus and reports measured timings. The regular tests use deterministic embeddings for cache and MCP behavior and require no model download.
+After preparing the model, run `npm run test:onnx --workspace plugins/geist` from the marketplace root for real inference and both prompt adapters. It uses a temporary four-document corpus and reports measured timings, then tests setup in a copied installation; that setup test needs network access. The regular tests use deterministic embeddings for cache and MCP behavior and require no model download.
+
+Bundled dependency licenses are included in `runtime/THIRD_PARTY_NOTICES.txt` and checked during the build.

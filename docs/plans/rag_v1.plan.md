@@ -64,7 +64,7 @@ sources:
 Checkout owns its transactional data.
 ```
 
-All metadata is optional. Frontmatter must be a mapping. `kind` and `state` are strings; `scope` is a string list. Links require root-relative `record` and allow string `kind`. Sources require string `source` and allow an ISO `YYYY-MM-DD` string `date`. Preserve unknown metadata and values. Mutation accepts complete raw Markdown, preserving YAML formatting and comments. Titles use the first H1, then the record ID.
+All metadata is optional. Frontmatter must be a mapping; circular YAML aliases are rejected because results and caches use JSON. `kind` and `state` are strings; `scope` is a string list. Links require root-relative `record` and allow string `kind`. Sources require string `source` and allow an ISO `YYYY-MM-DD` string `date`. Preserve unknown metadata and values. Mutation accepts complete raw Markdown, preserving YAML formatting and comments. Titles use the first H1, then the record ID.
 
 Recognized kinds: decision, fact, idea, constraint, preference, proposal, requirement, exception. Recognized states: draft, proposed, active, deprecated, superseded, rejected. No automatic lifecycle transitions or inferred relationship semantics. Broken links remain observable.
 
@@ -106,6 +106,14 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 - MCP tests cover tools, schemas, metadata preservation, filters, backlinks, conflicts, and containment.
 - Copied bundles run outside the checkout; prepared retrieval runs offline. Static hooks and non-search tools need no model dependency.
 - Commit source, generated bundles, docs, and this plan in tested Conventional Commit increments.
+
+## Implementation validation
+
+The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its document cache and prepared model remain local and ignored by Git.
+
+Windows validation passes 45 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, and lock recovery. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, refresh/rebuild, and setup outside the checkout. The four-document fixture indexed in about 224 ms, searched in 208 ms, and completed prompt hooks in about 300 ms. These are small-corpus smoke measurements, not a latency guarantee.
+
+A search for “How does Geist update or rebuild cached documents?” retrieves this plan. Host adapter tests invoke the shipped hook commands; they do not establish that an interactive host has installed and trusted this development version. The standard suite is configured for Windows and Linux CI; Linux execution was not performed locally.
 
 ## References
 

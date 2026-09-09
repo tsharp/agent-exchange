@@ -44003,24 +44003,36 @@ async function withLock(config2, name, action) {
     descriptor = openSync(path, "wx");
   } catch (error61) {
     if (error61.code !== "EEXIST") throw error61;
-    let abandoned = false;
+    const reclaim = safePath(config2.workspace, `${path}.reclaim`);
+    let guard;
     try {
-      const { pid } = JSON.parse(readFileSync2(path, "utf8"));
-      if (Number.isInteger(pid) && pid > 0) {
-        try {
-          process.kill(pid, 0);
-        } catch (probe) {
-          abandoned = probe.code === "ESRCH";
-        }
-      }
+      guard = openSync(reclaim, "wx");
     } catch {
+      throw new RagError("busy", `Geist ${name} lock recovery is busy; retry or inspect the recovery file`);
     }
-    if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
     try {
-      unlinkSync(path);
-      descriptor = openSync(path, "wx");
-    } catch {
-      throw new RagError("busy", `Geist ${name} lock changed; retry`);
+      let abandoned = false;
+      try {
+        const { pid } = JSON.parse(readFileSync2(path, "utf8"));
+        if (Number.isInteger(pid) && pid > 0) {
+          try {
+            process.kill(pid, 0);
+          } catch (probe) {
+            abandoned = probe.code === "ESRCH";
+          }
+        }
+      } catch {
+      }
+      if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
+      try {
+        unlinkSync(path);
+        descriptor = openSync(path, "wx");
+      } catch {
+        throw new RagError("busy", `Geist ${name} lock changed; retry`);
+      }
+    } finally {
+      closeSync(guard);
+      unlinkSync(reclaim);
     }
   }
   try {
@@ -44058,6 +44070,7 @@ function parseRecord(id, markdown) {
       const parsed = document.toJS({ maxAliasCount: 50 });
       if (!object3(parsed)) throw new Error("Frontmatter must be a mapping");
       frontmatter = parsed;
+      JSON.stringify(frontmatter);
     } catch {
       throw new RagError("invalid_record", "Invalid YAML frontmatter mapping");
     }
@@ -44108,7 +44121,14 @@ var RecordStore = class {
     const path = this.path(id);
     try {
       if (!statSync(path).isFile() || statSync(path).size > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record is not a file or exceeds 256 KiB");
-      return parseRecord(id, new TextDecoder("utf-8", { fatal: true }).decode(readFileSync3(path)));
+      let markdown;
+      try {
+        markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync3(path));
+      } catch (error61) {
+        if (error61.code === "ERR_ENCODING_INVALID_ENCODED_DATA") throw new RagError("invalid_record", "Record must contain valid UTF-8");
+        throw error61;
+      }
+      return parseRecord(id, markdown);
     } catch (error61) {
       if (error61.code === "ENOENT") throw new RagError("not_found", `Record not found: ${id}`);
       throw error61;
