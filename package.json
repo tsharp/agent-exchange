@@ -5,10 +5,12 @@
   "description": "Plugin marketplace for GitHub Copilot and OpenAI Codex.",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18.0"
   },
+  "workspaces": ["plugins/geist"],
   "scripts": {
-    "test": "npm run validate",
+    "build": "npm run build --workspace plugins/geist",
+    "test": "npm run validate && npm test --workspace plugins/geist",
     "validate": "node scripts/validate-marketplace.mjs"
   }
 }

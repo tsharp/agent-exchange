@@ -9,6 +9,7 @@
   "homepage": "https://github.com/tsharp/agent-exchange",
   "repository": "https://github.com/tsharp/agent-exchange",
   "license": "MIT",
-  "keywords": ["agent-skills", "productivity"],
-  "skills": "skills/"
+  "keywords": ["agent-skills", "hooks", "productivity"],
+  "skills": "skills/",
+  "hooks": "hooks/copilot-hooks.json"
 }

@@ -1,39 +1,49 @@
 # Agent Exchange
 
-A marketplace for independently installable plugins for GitHub Copilot and OpenAI Codex. The marketplace is `agent-exchange`; its first plugin is `geist`.
+A marketplace for independently installable plugins for GitHub Copilot and OpenAI Codex. Its marketplace identifier is `agent-exchange`.
 
-Each plugin lives under `plugins/<plugin-name>/` and can contain its own skills, agents, MCP servers, instructions, hooks, and supporting files. Geist is currently a scaffold with no bundled functionality.
+Each plugin lives under `plugins/<plugin-name>/` and can contain its own skills, agents, MCP servers, instructions, hooks, and supporting files.
 
-## Use this checkout
+## Available plugins
 
-Run these commands from the repository root to register the local marketplace and install its plugin.
+| Plugin | Description | Documentation |
+| --- | --- | --- |
+| Geist | Lifecycle hooks, workspace instructions, and optional external controllers | [Installation, configuration, and usage](./plugins/geist/README.md) |
 
-### OpenAI Codex CLI
+## Register the marketplace
+
+Choose either a local checkout or the GitHub source. Registering the marketplace makes its plugins available to install; follow each plugin's README to install and configure it.
+
+### From a local checkout
+
+Run the command for your host from this repository's root.
+
+OpenAI Codex CLI:
 
 ```powershell
 codex plugin marketplace add .
-codex plugin add geist@agent-exchange
 ```
 
-### GitHub Copilot CLI
+GitHub Copilot CLI:
 
 ```powershell
 copilot plugin marketplace add .
-copilot plugin install geist@agent-exchange
 ```
 
-## Install from GitHub
+### From GitHub
 
 Once the marketplace files have been committed and pushed to GitHub:
 
+OpenAI Codex CLI:
+
 ```bash
 codex plugin marketplace add tsharp/agent-exchange
-codex plugin add geist@agent-exchange
 ```
+
+GitHub Copilot CLI:
 
 ```bash
 copilot plugin marketplace add tsharp/agent-exchange
-copilot plugin install geist@agent-exchange
 ```
 
 ## Layout
@@ -41,27 +51,29 @@ copilot plugin install geist@agent-exchange
 ```text
 .agents/plugins/marketplace.json  # Codex marketplace
 .github/plugin/marketplace.json   # Copilot marketplace
-.github/workflows/validate.yml    # Manifest validation in CI
+.github/workflows/validate.yml    # Marketplace and plugin checks in CI
 scripts/validate-marketplace.mjs  # Local validation
 plugins/
-  geist/
-    .codex-plugin/plugin.json     # Geist's Codex manifest
-    .github/plugin/plugin.json   # Geist's Copilot manifest
-    skills/                      # Geist's shared skill sources
+  <plugin-name>/
+    README.md                    # Plugin installation, configuration, and usage
+    .codex-plugin/plugin.json    # Codex plugin manifest
+    .github/plugin/plugin.json   # Copilot plugin manifest
+    ...                          # Plugin-owned components
 ```
 
-Marketplace source paths are relative to the repository root. Both catalogs point Geist to `./plugins/geist`. Component paths in a plugin manifest are relative to that plugin's directory.
+Marketplace source paths are relative to the repository root. Component paths in a plugin manifest are relative to that plugin's directory.
 
 ## Develop
 
-Add Geist skills under `plugins/geist/skills/<category>/<skill-name>/`; see [the skills guide](./plugins/geist/skills/README.md). Keep each plugin's name, version, and shared metadata consistent between its Codex and Copilot manifests.
+Keep each plugin's name, version, and shared metadata consistent between its Codex and Copilot manifests.
 
-To add another plugin, create `plugins/<plugin-name>/` with its own `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`, then register it in both marketplace catalogs using `./plugins/<plugin-name>` as the source. Keep its components inside that directory and configure them using each host's supported discovery and manifest conventions. Skills are optional; plugins can provide different combinations of components. Installing a plugin selects that bundle independently of the others.
+To add another plugin, create `plugins/<plugin-name>/` with its own `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`, then register it in both marketplace catalogs using `./plugins/<plugin-name>` as the source. Add its README and an entry to the plugin table above. Keep its components inside that directory and configure them using each host's supported discovery and manifest conventions. Skills are optional; plugins can provide different combinations of components.
 
-Run the manifest checks with Node.js 22 or later; no dependency installation is required:
+Repository tooling requires Node.js 22.18 or later. Install development dependencies and run the marketplace and plugin checks:
 
 ```bash
+npm ci
 npm test
 ```
 
-Validation checks marketplace agreement, separate plugin directories, local source paths, plugin metadata, and shared skills directories when declared. It does not validate component content, host support for other components, or execute hooks.
+Marketplace validation checks catalog agreement, separate plugin directories, local source paths, plugin metadata, and skills directories when declared. CI runs the marketplace and plugin checks on Windows and Linux. See each plugin's README for its build process and component-specific tests.

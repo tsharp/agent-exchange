@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot SessionStart",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot SessionStart",
+        "timeoutSec": 5
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot UserPromptSubmit",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot UserPromptSubmit",
+        "timeoutSec": 5
+      }
+    ],
+    "subagentStart": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot SubagentStart",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot SubagentStart",
+        "timeoutSec": 5
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot SubagentStop",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot SubagentStop",
+        "timeoutSec": 5
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot Stop",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot Stop",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot SessionEnd",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot SessionEnd",
+        "timeoutSec": 3
+      }
+    ]
+  }
+}
