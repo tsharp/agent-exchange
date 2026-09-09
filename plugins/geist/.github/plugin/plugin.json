@@ -1,7 +1,7 @@
 {
-  "name": "agent-exchange",
+  "name": "geist",
   "version": "0.1.0",
-  "description": "Shared Agent Skills for GitHub Copilot and OpenAI Codex.",
+  "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
   "author": {
     "name": "tsharp",
     "url": "https://github.com/tsharp"

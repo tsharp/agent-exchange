@@ -1,7 +1,7 @@
 {
-  "name": "agent-exchange",
+  "name": "geist",
   "version": "0.1.0",
-  "description": "Shared Agent Skills for GitHub Copilot and OpenAI Codex.",
+  "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
   "author": {
     "name": "tsharp",
     "url": "https://github.com/tsharp"
@@ -12,12 +12,12 @@
   "keywords": ["agent-skills", "productivity"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Agent Exchange",
-    "shortDescription": "Use Agent Exchange in Codex.",
-    "longDescription": "A shared bundle for reusable Agent Skills. This initial scaffold contains no skills yet.",
+    "displayName": "Geist",
+    "shortDescription": "Use Geist in Codex.",
+    "longDescription": "The first plugin in the Agent Exchange marketplace. This initial scaffold contains no skills yet.",
     "developerName": "tsharp",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": "Help me use Agent Exchange."
+    "defaultPrompt": "Help me use Geist."
   }
 }

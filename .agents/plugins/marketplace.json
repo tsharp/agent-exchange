@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "agent-exchange",
+      "name": "geist",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/geist"
       },
       "policy": {
         "installation": "AVAILABLE",

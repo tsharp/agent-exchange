@@ -1,15 +1,15 @@
 {
   "name": "agent-exchange",
-  "description": "Shared Agent Skills for GitHub Copilot and OpenAI Codex.",
+  "description": "A plugin marketplace for GitHub Copilot and OpenAI Codex.",
   "owner": {
     "name": "tsharp",
     "url": "https://github.com/tsharp"
   },
   "plugins": [
     {
-      "name": "agent-exchange",
-      "description": "A shared bundle for reusable Agent Skills.",
-      "source": "./",
+      "name": "geist",
+      "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
+      "source": "./plugins/geist",
       "category": "productivity"
     }
   ]

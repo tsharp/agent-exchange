@@ -32,6 +32,8 @@ assert.equal(new Set(codex.plugins.map(({ name }) => name)).size, codex.plugins.
 for (const [index, entry] of codex.plugins.entries()) {
   const counterpart = copilot.plugins[index];
   assert.equal(entry.source.source, "local");
+  assert.equal(entry.source.path, `./plugins/${entry.name}`,
+    "Each plugin must have its own directory under plugins/");
   const pluginRoot = localPath(root, entry.source.path);
   assert.equal(pluginRoot, localPath(root, counterpart.source));
   assert.ok(["AVAILABLE", "NOT_AVAILABLE", "INSTALLED_BY_DEFAULT"].includes(entry.policy.installation));
@@ -50,7 +52,9 @@ for (const [index, entry] of codex.plugins.entries()) {
   }
   assert.ok(manifest.author.name.trim());
   assert.ok(manifest.interface.displayName.trim());
-  assert.equal(localPath(pluginRoot, manifest.skills), localPath(pluginRoot, other.skills));
+  if (manifest.skills !== undefined || other.skills !== undefined) {
+    assert.equal(localPath(pluginRoot, manifest.skills), localPath(pluginRoot, other.skills));
+  }
 }
 
 console.log(`Validated ${codex.plugins.length} plugin(s) in both ${codex.name} marketplaces.`);

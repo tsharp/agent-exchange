@@ -1,8 +1,8 @@
-# Skills
+# Geist skills
 
-Both plugin manifests load this directory. Add each skill once so Codex and Copilot use the same source.
+Both Geist plugin manifests load this directory. Add each skill once so Codex and Copilot use the same source. Other plugins keep their skills in their own plugin directories.
 
-Follow Geist's layout:
+Use this layout within `plugins/geist/`:
 
 ```text
 skills/
