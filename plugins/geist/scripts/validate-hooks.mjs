@@ -16,11 +16,16 @@ assert.equal(copilot.version, packageJson.version);
 assert.equal(codex.hooks, undefined, "Codex discovers the default hooks/hooks.json");
 assert.equal(copilot.hooks, "hooks/copilot-hooks.json");
 assert.ok(statSync(resolve(root, "runtime/hooks/run.mjs")).isFile());
+assert.ok(statSync(resolve(root, "runtime/rag/run.mjs")).isFile());
+assert.ok(statSync(resolve(root, "runtime/mcp/run.mjs")).isFile());
+assert.equal(codex.mcpServers, "./.mcp.json");
+assert.equal(copilot.mcpServers, ".mcp.json");
+assert.deepEqual(readJson(".mcp.json"), { mcpServers: { geist: { command: "node", args: ["${PLUGIN_ROOT}/runtime/mcp/run.mjs"] } } });
 
 for (const host of ["codex", "copilot"]) {
   const config = readJson(host === "codex" ? "hooks/hooks.json" : copilot.hooks);
-  const events = host === "codex" ? EVENTS : [
-    "sessionStart", "userPromptSubmitted", "subagentStart", "subagentStop", "agentStop", "sessionEnd",
+  const events = host === "codex" ? EVENTS.filter((event) => event !== "PreCompact") : [
+    "sessionStart", "userPromptTransformed", "subagentStart", "subagentStop", "agentStop", "sessionEnd", "preCompact",
   ];
   assert.deepEqual(Object.keys(config.hooks), events);
   if (host === "copilot") assert.equal(config.version, 1);
@@ -44,4 +49,4 @@ for (const host of ["codex", "copilot"]) {
       EVENTS[index] === "SessionEnd" ? 3 : 5);
   }
 }
-console.log("Validated all 12 Geist lifecycle hook mappings and bundled runner.");
+console.log("Validated all 13 Geist lifecycle hook mappings and bundled runner.");

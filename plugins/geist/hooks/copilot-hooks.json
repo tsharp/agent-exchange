@@ -9,7 +9,7 @@
         "timeoutSec": 5
       }
     ],
-    "userPromptSubmitted": [
+    "userPromptTransformed": [
       {
         "type": "command",
         "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot UserPromptSubmit",
@@ -47,6 +47,14 @@
         "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot SessionEnd",
         "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot SessionEnd",
         "timeoutSec": 3
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/runtime/hooks/run.mjs\" copilot PreCompact",
+        "powershell": "node \"$env:PLUGIN_ROOT\\runtime\\hooks\\run.mjs\" copilot PreCompact",
+        "timeoutSec": 5
       }
     ]
   }

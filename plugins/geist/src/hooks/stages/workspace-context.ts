@@ -16,6 +16,7 @@ function configuredInstructionFiles(workspace: string): string[] {
 
   const config = parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
   const instructions = config.instructions;
+  if (instructions === undefined) return [];
   if (!instructions || typeof instructions !== "object" || Array.isArray(instructions)) {
     throw new Error(`${configPath}: missing [instructions] table`);
   }

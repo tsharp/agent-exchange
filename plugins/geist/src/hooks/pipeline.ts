@@ -1,4 +1,4 @@
-export const EVENTS = ["SessionStart", "UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop", "SessionEnd"] as const;
+export const EVENTS = ["SessionStart", "UserPromptSubmit", "SubagentStart", "SubagentStop", "Stop", "SessionEnd", "PreCompact"] as const;
 
 export type Host = "copilot" | "codex";
 export type EventName = typeof EVENTS[number];
