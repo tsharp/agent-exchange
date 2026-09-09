@@ -1,0 +1,20 @@
+{
+  "name": "agent-exchange",
+  "interface": {
+    "displayName": "Agent Exchange"
+  },
+  "plugins": [
+    {
+      "name": "agent-exchange",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

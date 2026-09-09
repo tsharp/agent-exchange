@@ -1,0 +1,16 @@
+{
+  "name": "agent-exchange",
+  "description": "Shared Agent Skills for GitHub Copilot and OpenAI Codex.",
+  "owner": {
+    "name": "tsharp",
+    "url": "https://github.com/tsharp"
+  },
+  "plugins": [
+    {
+      "name": "agent-exchange",
+      "description": "A shared bundle for reusable Agent Skills.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

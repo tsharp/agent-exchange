@@ -1,0 +1,14 @@
+{
+  "name": "agent-exchange",
+  "version": "0.1.0",
+  "description": "Shared Agent Skills for GitHub Copilot and OpenAI Codex.",
+  "author": {
+    "name": "tsharp",
+    "url": "https://github.com/tsharp"
+  },
+  "homepage": "https://github.com/tsharp/agent-exchange",
+  "repository": "https://github.com/tsharp/agent-exchange",
+  "license": "MIT",
+  "keywords": ["agent-skills", "productivity"],
+  "skills": "skills/"
+}
