@@ -4,7 +4,7 @@ files = ["instructions.md"]
 [rag]
 enabled = true
 root = "docs"
-top_k = 3
+top_k = 5
 min_score = 0.25
 max_context_chars = 1800
 timeout_ms = 4000
