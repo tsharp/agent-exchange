@@ -11,9 +11,9 @@ This public plan records the implementation contract. The original draft is pres
 
 1. A workspace enables RAG in `.geist/config.toml` and prepares the local ONNX model once.
 2. Markdown files under the record root are canonical. Each file is a record identified by its root-relative path.
-3. Before search, scan and hash current files, embed changed documents, reuse unchanged embeddings, and remove deleted documents from a rebuildable cache.
-4. On every user prompt, automatically select up to `top_k` documents (default 3).
-5. Inject bounded, untrusted relevance hints: IDs, titles, source paths, scores, and excerpts. The agent decides whether to read full records through MCP or file tools. Preserve the separate, ordered TOML instruction flow.
+3. Before search, scan and hash current files, chunk changed documents and embed changed chunks, reuse unchanged embeddings, and remove deleted documents from a rebuildable cache.
+4. On every user prompt, automatically select up to `top_k` chunks (default 3).
+5. Inject bounded, untrusted relevance hints: IDs, titles, source paths, scores, and complete bounded chunks. The agent decides whether to read full records through MCP or file tools. Preserve the separate, ordered TOML instruction flow.
 6. MCP exposes discovery, reads, search, writes, relationships, and cache rebuild. Mutations invalidate affected cache entries; the next search synchronizes before returning results.
 
 V1 uses local CPU ONNX inference, normalized embeddings, cosine ranking, deterministic chunks, and a JSON cache. ONNX computes embeddings; JSON stores derived documents and vectors. Reranking, hosted inference, background watchers, a persistent retrieval daemon, graph traversal, and automatic knowledge creation are deferred.
@@ -76,7 +76,7 @@ Recognized kinds: decision, fact, idea, constraint, preference, proposal, requir
 
 Store parsed records, SHA-256 versions, chunks, and embeddings. Hash source bytes to detect even same-timestamp edits. Reuse unchanged documents. Renames are deletion plus creation. Missing, corrupt, or incompatible caches rebuild from records; explicit rebuild ignores cached embeddings. Publish snapshots atomically and serialize cooperating cache writers with a process lock. Busy or abandoned locks produce diagnostics instead of stale results. Cache deletion never changes records.
 
-Chunk the complete body into windows of at most 1000 characters with 150-character overlap, prefixing the title. Rank each document by its best chunk cosine score and use that chunk's excerpt. Sort by descending score, then ID. Queries are nonempty and at most 4000 characters. Query text and query embeddings are never persisted.
+Use the [Markdown chunking contract](../../plugins/geist/docs/chunking.md): section/heading boundaries, inherited structured metadata, 800-character bodies with bounded title/heading context, and stable chunk identities. Rank chunks independently, allowing multiple results per document. Sort by descending score, then record ID and source offset. Reuse unchanged chunk vectors even when another section changes. Queries are nonempty and at most 4000 characters. Query text and query embeddings are never persisted.
 
 Search defaults to active or omitted state. Explicit state filters can select any state; `include_inactive` allows all states. Kind/state/scope filters use exact strings, OR within a filter and AND across filters. Scopes imply no hierarchy. Listing includes all states.
 
@@ -84,9 +84,9 @@ Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than
 
 ### Session delivery
 
-For automatic hints, remember the last emitted version of each document within a host, workspace, record root, and session. Select the normal top_k results first, then suppress unchanged documents already emitted; do not fill the gaps with lower-ranked results. Mark only hints that fit the output budget. Changed documents and new sessions are eligible again. Explicit MCP/CLI search remains unaffected.
+For automatic hints, remember the last emitted version of each chunk within a host, workspace, record root, and session. Select the normal top_k results first, then suppress unchanged chunks already emitted; do not fill the gaps with lower-ranked results. Mark only hints that fit the output budget. Changed chunks and new sessions are eligible again. Explicit MCP/CLI search remains unaffected.
 
-Store only document IDs and version hashes in `.geist/cache/rag/sessions/`, using a hash of the host, record root, and session identity as the filename. No prompts, excerpts, conversation content, or raw session IDs enter this delivery state. Keep at most the latest 2000 document entries per session. Missing/corrupt state starts fresh. Without a session ID, retain stateless hints. SessionEnd removes the session's state; orphaned state can be deleted with the cache.
+Store only record/chunk identities and chunk version hashes in `.geist/cache/rag/sessions/`, using a hash of the host, record root, and session identity as the filename. No prompts, excerpts, conversation content, or raw session IDs enter this delivery state. Keep at most the latest 2000 chunk entries per session. Missing/corrupt state starts fresh. Without a session ID, retain stateless hints. SessionEnd removes the session's state; orphaned state can be deleted with the cache.
 
 Reset delivery state on fresh/cleared sessions and compaction, but preserve it on resume while it exists. Codex uses `SessionStart` with source `compact` or `clear`; Copilot uses `preCompact`. Copilot prompt hints use `userPromptTransformed` and preserve the original transformed prompt. Delivery runs after successful optional stages/controllers, so blocking or failed processing does not consume hints. Metadata records hook emission, not confirmation that the host or model consumed the hints.
 
@@ -99,7 +99,7 @@ The local stdio MCP server is named `geist`. Tools expose input schemas and stru
 | prepare_runtime | No arguments | prepared, pinned model signature, embedding dimensions; initialization errors use model_unavailable |
 | list_records | Optional kind/state/scope lists, prefix, offset (0), limit (50, max 200) | Summaries sorted by ID, total, next offset, warnings |
 | get_record | id | ID, title, body, metadata, links, sources, raw Markdown, SHA-256 version |
-| search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked IDs, versions, titles, paths, scores, excerpts, warnings, refresh counts |
+| search_records | query; optional filters, include_inactive, limit (top_k, max 20) | Ranked record/chunk IDs and versions, titles, paths, scores, content, headings, metadata, body offsets, preview excerpts, warnings, refresh counts |
 | create_record | id, complete raw markdown | Created record and cache invalidation status; existing files fail |
 | update_record | id, complete raw markdown, expected_version | Updated record; missing or changed records fail |
 | delete_record | id, expected_version | Deleted ID and cache invalidation status |
@@ -113,7 +113,7 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 ## Acceptance criteria
 
 - Ordered static instructions still work on both hosts, with no conversation capture.
-- Each configured prompt receives up to three configurable document hints within execution and text budgets.
+- Each configured prompt receives up to three configurable chunk hints within execution and text budgets.
 - Repeated hints are suppressed across hook processes in one session; edits and compaction restore eligibility. Budget exclusions, isolated sessions/hosts/roots, resume, cleanup, corrupt state, and blocked processing are tested without recording conversations.
 - A real local ONNX run demonstrates semantic retrieval.
 - Cache tests cover reuse, changes, deletions, renames, corruption, model/schema invalidation, rebuild, and no prompt persistence.
@@ -122,6 +122,8 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 - Commit source, generated bundles, docs, and this plan in tested Conventional Commit increments.
 
 ## Implementation validation
+
+The structured chunking extension adds Markdown/annotation fixtures, stable-identity and vector-reuse checks, and chunk-level delivery regressions. The following v1 measurements describe the earlier document-level implementation.
 
 The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its document cache and prepared model remain local and ignored by Git.
 

@@ -3,23 +3,18 @@ import { join } from "node:path";
 import { RagError, safePath } from "./config.ts";
 import { atomicWrite, withLock } from "./files.ts";
 import { RecordStore, matches, type Filters, type RecordData } from "./records.ts";
+import { chunkMarkdown, CHUNKER_SIGNATURE, type MarkdownChunk } from "./chunking.ts";
 import type { Embedder } from "./embedding.ts";
 
-const FORMAT = "geist-document-cache-v1:chars1000:overlap150";
-type Entry = { record: RecordData; chunks: string[]; vectors: number[][] };
+const FORMAT = `geist-chunk-cache-v2:${CHUNKER_SIGNATURE}`;
+type Entry = { record: RecordData; chunks: MarkdownChunk[]; vectors: number[][] };
 type Snapshot = { format: string; model: string; root: string; entries: Entry[] };
 export type Refresh = { total: number; updated: number; reused: number; removed: number; warnings: string[] };
 export type SearchOptions = Filters & { limit?: number; include_inactive?: boolean };
-export type Match = { id: string; version: string; title: string; path: string; score: number; excerpt: string };
+export type Match = { id: string; version: string; title: string; path: string; score: number; excerpt: string; chunk_id: string; chunk_version: string; content: string; headings: string[]; metadata: Record<string, string>; start: number; end: number };
 
-export function chunksFor(record: RecordData): string[] {
-  const text = record.body.trim();
-  const chunks: string[] = [];
-  for (let start = 0; start < text.length; start += 850) {
-    chunks.push(`${record.title}\n${text.slice(start, start + 1000)}`);
-    if (start + 1000 >= text.length) break;
-  }
-  return chunks.length ? chunks : [record.title];
+export function chunksFor(record: RecordData): MarkdownChunk[] {
+  return chunkMarkdown(record.body, record.title);
 }
 
 function validVectors(value: unknown, count: number): value is number[][] {
@@ -57,7 +52,15 @@ export class DocumentCache {
           entries.push({ record, chunks, vectors: cached.vectors });
           reused++;
         } else {
-          const vectors = await this.embedder.embed(chunks);
+          const reusable = new Map<string, number[]>();
+          if (!rebuild && cached && Array.isArray(cached.chunks) && cached.chunks.every((chunk) => chunk && typeof chunk.version === "string") && validVectors(cached.vectors, cached.chunks.length)) {
+            cached.chunks.forEach((chunk, index) => reusable.set(chunk.version, cached.vectors[index]));
+          }
+          const missing = chunks.filter((chunk) => !reusable.has(chunk.version));
+          const fresh = missing.length ? await this.embedder.embed(missing.map((chunk) => chunk.embeddingText)) : [];
+          if (missing.length && !validVectors(fresh, missing.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
+          missing.forEach((chunk, index) => reusable.set(chunk.version, fresh[index]));
+          const vectors = chunks.map((chunk) => reusable.get(chunk.version)!);
           if (!validVectors(vectors, chunks.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
           entries.push({ record, chunks, vectors });
           updated++;
@@ -87,20 +90,23 @@ export class DocumentCache {
     if (!candidates.length) return { matches: [], refresh };
     const [vector] = await this.embedder.embed([query]);
     if (!validVectors([vector], 1)) throw new RagError("model_unavailable", "Invalid query vector");
-    const ranked: Match[] = candidates.map((entry) => {
-      let score = -Infinity, best = 0;
-      entry.vectors.forEach((candidate, index) => {
+    const ranked: Match[] = candidates.flatMap((entry) => {
+      const seen = new Set<string>();
+      return entry.chunks.flatMap((chunk, index) => {
+        if (seen.has(chunk.id)) return [];
+        seen.add(chunk.id);
+        const candidate = entry.vectors[index];
         if (candidate.length !== vector.length) throw new RagError("model_unavailable", "Embedding dimensions changed; rebuild the cache");
         const dot = candidate.reduce((sum, value, offset) => sum + value * vector[offset], 0);
         const norm = Math.sqrt(candidate.reduce((sum, value) => sum + value * value, 0) * vector.reduce((sum, value) => sum + value * value, 0));
-        const similarity = norm ? dot / norm : 0;
-        if (similarity > score) { score = similarity; best = index; }
+        const score = norm ? dot / norm : 0;
+        return [{ id: entry.record.id, version: entry.record.version, title: entry.record.title,
+          path: this.store.path(entry.record.id), score: Math.round(score * 1e6) / 1e6,
+          chunk_id: chunk.id, chunk_version: chunk.version, content: chunk.text, headings: chunk.headings, metadata: chunk.metadata,
+          start: chunk.start, end: chunk.end, excerpt: chunk.text.replace(/\s+/g, " ").slice(0, 240) }];
       });
-      return { id: entry.record.id, version: entry.record.version, title: entry.record.title,
-        path: this.store.path(entry.record.id), score: Math.round(score * 1e6) / 1e6,
-        excerpt: entry.chunks[best].replace(/\s+/g, " ").slice(0, 240) };
     });
     return { matches: ranked.filter((match) => match.score >= this.store.config.minScore)
-      .sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, limit), refresh };
+      .sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : a.start - b.start)).slice(0, limit), refresh };
   }
 }

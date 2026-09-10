@@ -19,24 +19,33 @@ function fixture(t) {
   writeFileSync(join(workspace, ".geist", "config.toml"), "[rag]\nenabled=true\n");
   const config = readRagConfig(workspace);
   const request = { host: "codex", event: "UserPromptSubmit", workspace, input: { session_id: "private/session:one", prompt: "private question" } };
-  const matches = ["a", "b", "c", "d"].map((id) => ({ id: `${id}.md`, version: "a".repeat(64), title: `Title ${id}`, path: `/docs/${id}.md`, score: 1, excerpt: "private excerpt" }));
+  const matches = ["a", "b", "c", "d"].map((id) => ({ id: `${id}.md`, version: "a".repeat(64), chunk_id: id, chunk_version: "a".repeat(64), content: "private excerpt", headings: [], metadata: {}, start: 0, end: 15, title: `Title ${id}`, path: `/docs/${id}.md`, score: 1, excerpt: "private excerpt" }));
   return { workspace, config, request, matches };
 }
 
 const ids = (text) => text ? JSON.parse(text.slice(text.indexOf("\n") + 1)).map((hint) => hint.id) : [];
 
+test("delivery tracks chunks within one document independently of its version", async (t) => {
+  const { config, request, matches } = fixture(t);
+  const first = { ...matches[0], id: "guide.md" };
+  const second = { ...matches[1], id: "guide.md" };
+  assert.deepEqual(ids(await deliverHints(config, request, [first])), ["guide.md"]);
+  assert.deepEqual(ids(await deliverHints(config, request, [{ ...first, version: "f".repeat(64) }, second])), ["guide.md"]);
+  assert.equal(await deliverHints(config, request, [first, second]), "");
+});
+
 test("session delivery suppresses repeats without backfill and permits changed versions", async (t) => {
   const { config, request, matches } = fixture(t);
   assert.deepEqual(ids(await deliverHints(config, request, matches)), ["a.md", "b.md", "c.md"]);
   assert.equal(await deliverHints(config, request, matches), "", "do not backfill d.md");
-  const changed = matches.map((match, index) => index === 1 ? { ...match, version: "b".repeat(64) } : match);
+  const changed = matches.map((match, index) => index === 1 ? { ...match, chunk_version: "b".repeat(64) } : match);
   assert.deepEqual(ids(await deliverHints(config, request, changed)), ["b.md"]);
   const directory = join(config.cacheDirectory, "sessions");
   const files = readdirSync(directory);
   assert.match(files[0], /^[0-9a-f]{64}\.json$/);
   const raw = readFileSync(join(directory, files[0]), "utf8");
-  assert.deepEqual(JSON.parse(raw), { format: 1, delivered: [
-    { id: "a.md", version: "a".repeat(64) }, { id: "c.md", version: "a".repeat(64) }, { id: "b.md", version: "b".repeat(64) },
+  assert.deepEqual(JSON.parse(raw), { format: 2, delivered: [
+    { id: JSON.stringify(["a.md", "a"]), version: "a".repeat(64) }, { id: JSON.stringify(["c.md", "c"]), version: "a".repeat(64) }, { id: JSON.stringify(["b.md", "b"]), version: "b".repeat(64) },
   ] });
   for (const privateValue of [request.input.session_id, request.input.prompt, "private excerpt", "Title", "/docs/"]) assert.equal(raw.includes(privateValue), false);
 });
@@ -44,7 +53,7 @@ test("session delivery suppresses repeats without backfill and permits changed v
 test("only hints fitting the budget are remembered, and identities remain isolated", async (t) => {
   const { config, request, matches } = fixture(t);
   const constrained = { ...config, maxContextChars: 256 };
-  const tooLarge = [{ ...matches[0], title: "x".repeat(160), excerpt: "x".repeat(240) }];
+  const tooLarge = [{ ...matches[0], title: "x".repeat(160), content: "x".repeat(240) }];
   assert.equal(await deliverHints(constrained, request, tooLarge), "");
   assert.deepEqual(ids(await deliverHints(config, request, tooLarge)), ["a.md"]);
   const otherSession = { ...request, input: { session_id: "other" } };
@@ -112,7 +121,7 @@ for (const host of ["codex", "copilot"]) {
     run("SubagentStart");
     run("Stop");
     assert.deepEqual(run("UserPromptSubmit"), {});
-    writeFileSync(join(workspace, "matches.json"), JSON.stringify({ matches: matches.map((match, index) => index === 0 ? { ...match, version: "c".repeat(64) } : match) }));
+    writeFileSync(join(workspace, "matches.json"), JSON.stringify({ matches: matches.map((match, index) => index === 0 ? { ...match, chunk_version: "c".repeat(64) } : match) }));
     assert.deepEqual(ids(context(run("UserPromptSubmit"))), ["a.md"]);
     if (host === "codex") run("SessionStart", { source: "compact" }); else run("PreCompact", { trigger: "auto" });
     assert.equal(ids(context(run("UserPromptSubmit"))).length, 3);
@@ -126,7 +135,7 @@ for (const host of ["codex", "copilot"]) {
 }
 
 test("hint formatting enforces top_k and the total context budget", () => {
-  const matches = Array.from({ length: 10 }, (_, index) => ({ id: `${index}.md`, title: `Document ${index}`, path: `/docs/${index}.md`, score: 1, excerpt: "x".repeat(300) }));
+  const matches = Array.from({ length: 10 }, (_, index) => ({ id: `${index}.md`, title: `Document ${index}`, path: `/docs/${index}.md`, score: 1, chunk_id: String(index), content: "x".repeat(300) }));
   const output = formatHints(matches, { topK: 3, maxContextChars: 1800 }).text;
   assert.match(output, /untrusted reference data/);
   assert.equal(JSON.parse(output.slice(output.indexOf("\n") + 1)).length, 3);

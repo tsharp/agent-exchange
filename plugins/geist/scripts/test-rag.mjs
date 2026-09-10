@@ -175,6 +175,22 @@ test("failed inference leaves the previous snapshot intact", async (t) => {
   assert.equal(existsSync(join(f.config.cacheDirectory, "index.lock")), false);
 });
 
+test("search returns multiple chunks per document and edits reuse unaffected vectors", async (t) => {
+  const f = fixture(t);
+  await f.store.write("guide.md", "## Database\nPostgres settings.\n## Cooking\nBread recipes.");
+  const first = await f.cache.search("database");
+  assert.equal(first.matches.length, 2);
+  assert.deepEqual(first.matches.map((m) => m.id), ["guide.md", "guide.md"]);
+  assert.notEqual(first.matches[0].chunk_id, first.matches[1].chunk_id);
+  const cooking = first.matches.find((m) => m.content.includes("Bread"));
+  const calls = f.calls();
+  writeFileSync(f.store.path("guide.md"), "## Database\nUpdated Postgres settings.\n## Cooking\nBread recipes.");
+  await f.cache.refresh();
+  assert.equal(f.calls() - calls, 1, "only changed chunk is embedded");
+  const next = await f.cache.search("database");
+  assert.equal(next.matches.find((m) => m.content.includes("Bread")).chunk_id, cooking.chunk_id);
+});
+
 test("RAG config validates bounds and workspace containment", (t) => {
   const { root } = fixture(t);
   for (const content of ['root = "../outside"', 'top_k = 0', 'timeout_ms = 5000', 'unknown = true']) {

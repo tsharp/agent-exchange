@@ -1,6 +1,6 @@
 # Geist
 
-Geist provides ordered workspace instructions and local document retrieval for GitHub Copilot and OpenAI Codex. When RAG is enabled, each user prompt receives a few document hints that the agent can choose to investigate. Geist does not capture or store conversation logs.
+Geist provides ordered workspace instructions and local document retrieval for GitHub Copilot and OpenAI Codex. When RAG is enabled, each user prompt receives a few relevant chunks that the agent can choose to investigate. Geist does not capture or store conversation logs.
 
 Geist is installed as `geist@agent-exchange`. It includes its own Markdown-record MCP server and optional external-controller support. The original Geist's skills and Mimir server are not included.
 
@@ -123,19 +123,21 @@ node plugins/geist/runtime/rag/run.mjs index .
 node plugins/geist/runtime/rag/run.mjs search . "How are documents cached?"
 ```
 
-After enabling and trusting the hooks, submit prompts normally. Geist refreshes changed records, ranks them using local ONNX embeddings, and injects up to three hints containing IDs, paths, titles, scores, and short excerpts. Hints are explicitly untrusted reference data. The agent can ignore them or call `get_record` for full content; retrieved documents do not become workspace instructions.
+After enabling and trusting the hooks, submit prompts normally. Geist refreshes changed records, ranks them using local ONNX embeddings, and injects up to three hints containing record/chunk IDs, paths, titles, scores, headings, metadata, source offsets, and complete bounded chunk content. Hints are explicitly untrusted reference data. The agent can ignore them or call `get_record` for full content; retrieved documents do not become workspace instructions.
 
-Within a session, unchanged document hints are emitted once. Geist checks the top-ranked results and suppresses those already emitted, so a later prompt may receive fewer hints or none. It does not replace suppressed results with lower-ranked documents. Edits make a document eligible again. Explicit MCP/CLI searches always return their normal results.
+Within a session, unchanged chunks are emitted once. Geist checks the top-ranked results and suppresses those already emitted, so a later prompt may receive fewer hints or none. It does not replace suppressed results with lower-ranked chunks. Edits make only changed chunks eligible again; other sections of the same document remain independently retrievable. Explicit MCP/CLI searches always return their normal results.
 
 Fresh sessions, context clearing, and compaction reset this delivery state. Resume preserves it while the state still exists; session end removes it. Codex reports compaction through `SessionStart`; Copilot uses `preCompact` and receives prompt hints through `userPromptTransformed`. After updating Geist, restart your host and review changed hooks as required.
 
 `top_k` accepts 1–20. The total hint text is bounded by `max_context_chars` (256–8000). `min_score` accepts 0–1; fewer hints are returned when documents score below it. Set it to 0 while exploring a small corpus. `timeout_ms` accepts 100–4500. Retrieval failures leave the prompt usable and emit a short diagnostic. Long prompts use their first 4000 characters as the search query.
 
+See the [chunking specification](docs/chunking.md) for StructuredMarkdown annotations, ordinary Markdown fallback, stable identities, and source offsets. Search limits count chunks, including multiple chunks from one document.
+
 ### Cache maintenance
 
 Geist keeps a rebuildable JSON document cache in `.geist/cache/rag/`. Source Markdown remains canonical. Searches hash source files, reuse unchanged embeddings, and refresh additions, edits, deletions, and renames, including changes made by an editor or Git. MCP writes mark the cache dirty; the next search refreshes it before returning results. Query text and query embeddings are not saved.
 
-Deduplication metadata lives separately in `.geist/cache/rag/sessions/`. Files use hashed host/root/session keys and contain only document IDs and version hashes, with at most the latest 2000 entries per session. They contain no prompts, excerpts, raw session IDs, or conversation text. Without a session ID, hints remain stateless. Missing or corrupt metadata starts fresh; deleting `sessions/` resets deduplication without rebuilding embeddings. Cache rebuilds alone preserve delivery state. A session that ends abruptly can leave a harmless metadata file until the cache is removed.
+Deduplication metadata lives separately in `.geist/cache/rag/sessions/`. Files use hashed host/root/session keys and contain only record/chunk identities and chunk version hashes, with at most the latest 2000 entries per session. They contain no prompts, excerpts, raw session IDs, or conversation text. Without a session ID, hints remain stateless. Missing or corrupt metadata starts fresh; deleting `sessions/` resets deduplication without rebuilding embeddings. Cache rebuilds alone preserve delivery state. A session that ends abruptly can leave a harmless metadata file until the cache is removed.
 
 Delivery metadata records what Geist emits, not whether the host or model consumed it. It does not track manual document reads. A host interruption after metadata is saved can leave a hint marked as delivered; clearing the session's delivery metadata makes it eligible again.
 
@@ -157,7 +159,7 @@ The plugin registers a local `geist` MCP server for both hosts. Codex loads the 
 | `prepare_runtime` | Install the pinned runtime/model and verify local inference; safe to repeat. |
 | `list_records` | List and filter record metadata with offset/limit pagination. |
 | `get_record` | Read raw Markdown, metadata, and a version hash. |
-| `search_records` | Retrieve ranked document excerpts from the current corpus. |
+| `search_records` | Retrieve ranked Markdown chunks from the current corpus. |
 | `create_record` | Create a Markdown record without replacing existing files. |
 | `update_record` | Replace raw Markdown using the version from the latest read. |
 | `delete_record` | Delete a record using its current version. |
