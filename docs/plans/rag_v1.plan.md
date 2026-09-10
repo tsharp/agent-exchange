@@ -46,6 +46,8 @@ Codex loads root `plugin.json` and typed `mcp.json` using the Agent Plugins 1.0 
 
 Codex 0.153.4 explicitly skips hook loading for portable plugins. Keep the working portable MCP package and provide `scripts/setup-codex-hooks.mjs install|remove` as a temporary user-hook registration workaround. It preserves unrelated hooks, replaces its previous registrations on update, and never grants trust. Remove these registrations before plugin uninstall or migration to native portable-hook discovery. Marketplace installation alone does not activate hooks on this host version.
 
+Compatibility registrations contain absolute paths to an installed snapshot. After every plugin update, rerun registration from the new snapshot; removing the old snapshot otherwise leaves hooks failing before Geist starts. Runtime diagnostics use stderr, with no persistent failure log. Diagnose launcher failures by replaying the registered command and inspecting stderr; logging inside the runner cannot capture a missing runner file.
+
 ### Global store and instructions
 
 Treat the user directory as the root of a second store. Read its configuration from `~/.geist/config.toml`, its instructions relative to that file, and its default records from `~/.geist/docs/`. Global instructions precede local instructions, retaining each TOML array's order. `GEIST_CONFIG_FILE` affects only the workspace configuration. Enable automatic global and workspace retrieval independently; a global-only setup works without project configuration. Combine enabled stores under the enabled workspace's top_k/text/deadline budgets, otherwise the global budgets. Each store applies its own minimum score.

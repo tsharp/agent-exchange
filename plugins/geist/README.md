@@ -212,11 +212,23 @@ See the [hook reference](./hooks/README.md#external-controller-protocol) for the
 | Zero Geist hooks in Codex | On Codex 0.153.4, run `setup-codex-hooks.mjs install` from the installed plugin, then restart. |
 | Geist hooks are installed but inactive | Open `/hooks`, review and trust the six Geist compatibility hooks, then start a new session. |
 | The runner cannot start | Check `node --version` and, on Windows, `pwsh --version` in the host environment. |
+| `Hook failed` / `hook exited with code 1` after updating Geist | Check the runner path in `~/.codex/hooks.json`. Compatibility registrations point to a specific installed snapshot; rerun `setup-codex-hooks.mjs install` from the current installed plugin, then restart Codex and review `/hooks`. |
 | Workspace instructions are missing | Check the active project's `.geist/config.toml`, its `instructions.files` list, and any environment overrides, then start a new session. |
 | Instruction configuration fails | Confirm the TOML is valid and every listed file exists inside the config directory. |
 | No document hints appear | Check `[rag].enabled`, run setup and index for the installed plugin, and try `min_score = 0`. Check diagnostics for timeouts or invalid records. |
 | MCP reads the wrong record directory | Set `GEIST_WORKSPACE_DIR` in the MCP host environment to the consuming project's absolute path. |
 | MCP closes during initialization with a literal `${PLUGIN_ROOT}` path in the error | Check that the installed plugin includes root `plugin.json` and `mcp.json`. Codex 0.153.4 does not expand that placeholder in the legacy `.mcp.json` launch path; the portable MCP configuration handles it. |
+
+To see the underlying startup error on Windows, replay the registered Geist `SessionStart` command from the consuming workspace:
+
+```powershell
+$geistCodexDirectory = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$geistHooks = Get-Content -Raw (Join-Path $geistCodexDirectory 'hooks.json') | ConvertFrom-Json
+$geistStart = $geistHooks.hooks.SessionStart.hooks | Where-Object { $_.statusMessage -eq 'Geist (Agent Exchange) compatibility: SessionStart' }
+@{ cwd = (Get-Location).Path; source = 'startup' } | ConvertTo-Json -Compress | & pwsh -NoProfile -NonInteractive -Command $geistStart.commandWindows
+```
+
+This executes the configured startup hook and prints its stderr alongside protocol output. `Cannot find module` naming an old installed snapshot means the registration is stale. That failure happens before Geist starts, so an in-process Geist logger cannot capture it. Persistent failure diagnostics would need to capture launcher stderr as well as runtime errors; prompts, hook payloads, and retrieved content should stay out of diagnostic logs. Geist currently emits runtime diagnostics to stderr and does not maintain a failure log file.
 
 ## Develop Geist
 
