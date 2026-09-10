@@ -146,8 +146,5 @@ vite.config.ts.timestamp-*
 target/
 
 # Geist
-.geist/cache/
-.geist/temp/
-.geist/plans/
-.geist/*.plan.md
+.geist/
 plugins/*/models/
