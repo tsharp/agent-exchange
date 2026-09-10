@@ -1,6 +1,6 @@
 {
   "name": "geist",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
   "author": {
     "name": "tsharp",
