@@ -147,6 +147,7 @@ target/
 
 # Geist
 .geist/cache/
+.geist/temp/
 .geist/plans/
 .geist/*.plan.md
 plugins/*/models/

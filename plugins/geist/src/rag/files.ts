@@ -14,15 +14,15 @@ export function atomicWrite(path: string, content: string | Uint8Array): void {
 }
 
 export async function withLock<T>(config: RagConfig, name: string, action: () => T | Promise<T>): Promise<T> {
-  safePath(config.workspace, config.cacheDirectory);
+  safePath(config.cacheRoot, config.cacheDirectory);
   mkdirSync(config.cacheDirectory, { recursive: true });
-  const path = safePath(config.workspace, join(config.cacheDirectory, `${name}.lock`));
+  const path = safePath(config.cacheRoot, join(config.cacheDirectory, `${name}.lock`));
   let descriptor: number;
   try { descriptor = openSync(path, "wx"); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     // Only one contender may inspect and reclaim a dead owner's lock at a time.
-    const reclaim = safePath(config.workspace, `${path}.reclaim`);
+    const reclaim = safePath(config.cacheRoot, `${path}.reclaim`);
     let guard: number;
     try { guard = openSync(reclaim, "wx"); }
     catch { throw new RagError("busy", `Geist ${name} lock recovery is busy; retry or inspect the recovery file`); }

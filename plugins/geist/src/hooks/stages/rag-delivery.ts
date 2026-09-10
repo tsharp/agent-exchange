@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
-import { safePath, type RagConfig } from "../../rag/config.ts";
+import { readRagConfig, safePath, type RagConfig } from "../../rag/config.ts";
 import { atomicWrite, withLock } from "../../rag/files.ts";
 import type { Match } from "../../rag/cache.ts";
 import { stringField, type HookRequest } from "../pipeline.ts";
@@ -12,7 +12,7 @@ type Delivery = { id: string; version: string };
 export function formatHints(matches: Match[], config: Pick<RagConfig, "topK" | "maxContextChars">) {
   const hints: object[] = [], delivered: Match[] = [];
   for (const match of matches.slice(0, config.topK)) {
-    const hint = { id: match.id, title: match.title.slice(0, 160), path: match.path, score: match.score, chunk_id: match.chunk_id, headings: match.headings, metadata: match.metadata, start: match.start, end: match.end, content: match.content };
+    const hint = { store: match.store, id: match.id, title: match.title.slice(0, 160), path: match.path, score: match.score, chunk_id: match.chunk_id, headings: match.headings, metadata: match.metadata, start: match.start, end: match.end, content: match.content };
     if ((LABEL + JSON.stringify([...hints, hint])).length <= config.maxContextChars) {
       hints.push(hint);
       delivered.push(match);
@@ -24,8 +24,8 @@ export function formatHints(matches: Match[], config: Pick<RagConfig, "topK" | "
 function sessionState(config: RagConfig, request: HookRequest) {
   const id = stringField(request.input, "session_id", "sessionId");
   if (!id?.trim()) return undefined;
-  const key = createHash("sha256").update(JSON.stringify([request.host, config.root, id])).digest("hex");
-  return { path: safePath(config.workspace, join(config.cacheDirectory, "sessions", `${key}.json`)), lock: `delivery-${key}` };
+  const key = createHash("sha256").update(JSON.stringify([request.host, config.workspace, config.root, readRagConfig(config.workspace, "global").root, id])).digest("hex");
+  return { path: safePath(config.cacheRoot, join(config.cacheDirectory, "sessions", `${key}.json`)), lock: `delivery-${key}` };
 }
 
 function readDeliveries(path: string): Delivery[] {
@@ -50,15 +50,15 @@ export async function deliverHints(config: RagConfig, request: HookRequest, matc
   if (!state) return formatHints(ranked, config).text;
   return withLock(config, state.lock, () => {
     const seen = new Map(readDeliveries(state.path).map(({ id, version }) => [id, version]));
-    const result = formatHints(ranked.filter((match) => seen.get(JSON.stringify([match.id, match.chunk_id])) !== match.chunk_version), config);
+    const result = formatHints(ranked.filter((match) => seen.get(JSON.stringify([match.store, match.id, match.chunk_id])) !== match.chunk_version), config);
     if (result.delivered.length) {
       for (const match of result.delivered) {
-        seen.delete(JSON.stringify([match.id, match.chunk_id]));
-        seen.set(JSON.stringify([match.id, match.chunk_id]), match.chunk_version);
+        seen.delete(JSON.stringify([match.store, match.id, match.chunk_id]));
+        seen.set(JSON.stringify([match.store, match.id, match.chunk_id]), match.chunk_version);
       }
       const delivered = [...seen].slice(-2000).map(([id, version]) => ({ id, version }));
       mkdirSync(dirname(state.path), { recursive: true });
-      atomicWrite(safePath(config.workspace, state.path), JSON.stringify({ format: 2, delivered }));
+      atomicWrite(safePath(config.cacheRoot, state.path), JSON.stringify({ format: 2, delivered }));
     }
     return result.text;
   });
@@ -68,6 +68,6 @@ export async function resetDelivery(config: RagConfig, request: HookRequest): Pr
   const state = sessionState(config, request);
   if (!state || !existsSync(state.path)) return;
   await withLock(config, state.lock, () => {
-    if (existsSync(state.path)) unlinkSync(safePath(config.workspace, state.path));
+    if (existsSync(state.path)) unlinkSync(safePath(config.cacheRoot, state.path));
   });
 }

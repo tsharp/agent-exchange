@@ -1,3 +1,4 @@
+import "./test-user-env.mjs";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,7 +13,7 @@ import { ragContextStage } from "../src/hooks/stages/rag-context.ts";
 const runner = resolve("runtime/hooks/run.mjs");
 const controllerFixture = resolve("scripts/fixtures/hook-controller.mjs");
 const directory = mkdtempSync(join(tmpdir(), "geist-hooks-"));
-const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
 const instructionFile = join(directory, "instructions.md");
 const configFile = join(directory, "config.toml");
 writeFileSync(instructionFile, "Workspace instructions\n");

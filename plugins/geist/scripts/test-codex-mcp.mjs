@@ -1,3 +1,4 @@
+import "./test-user-env.mjs";
 import assert from "node:assert/strict";
 import { cpSync, readFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,7 +26,7 @@ test("Codex installs Geist, initializes MCP, and discovers removable compatibili
       policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" }, category: "Productivity" }],
   }));
   const codex = process.env.GEIST_CODEX_BIN || "codex";
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_") && !["PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"].includes(key)));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_") && !["PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"].includes(key)));
   env.CODEX_HOME = testHome;
   const cli = (...args) => {
     const result = spawnSync(codex, args, { cwd: workspace, env, encoding: "utf8", windowsHide: true, timeout: 30000 });

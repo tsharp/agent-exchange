@@ -1,3 +1,4 @@
+import "./test-user-env.mjs";
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,7 +20,7 @@ function fixture(t) {
   writeFileSync(join(workspace, ".geist", "config.toml"), "[rag]\nenabled=true\n");
   const config = readRagConfig(workspace);
   const request = { host: "codex", event: "UserPromptSubmit", workspace, input: { session_id: "private/session:one", prompt: "private question" } };
-  const matches = ["a", "b", "c", "d"].map((id) => ({ id: `${id}.md`, version: "a".repeat(64), chunk_id: id, chunk_version: "a".repeat(64), content: "private excerpt", headings: [], metadata: {}, start: 0, end: 15, title: `Title ${id}`, path: `/docs/${id}.md`, score: 1, excerpt: "private excerpt" }));
+  const matches = ["a", "b", "c", "d"].map((id) => ({ store: "workspace", id: `${id}.md`, version: "a".repeat(64), chunk_id: id, chunk_version: "a".repeat(64), content: "private excerpt", headings: [], metadata: {}, start: 0, end: 15, title: `Title ${id}`, path: `/docs/${id}.md`, score: 1, excerpt: "private excerpt" }));
   return { workspace, config, request, matches };
 }
 
@@ -45,7 +46,7 @@ test("session delivery suppresses repeats without backfill and permits changed v
   assert.match(files[0], /^[0-9a-f]{64}\.json$/);
   const raw = readFileSync(join(directory, files[0]), "utf8");
   assert.deepEqual(JSON.parse(raw), { format: 2, delivered: [
-    { id: JSON.stringify(["a.md", "a"]), version: "a".repeat(64) }, { id: JSON.stringify(["c.md", "c"]), version: "a".repeat(64) }, { id: JSON.stringify(["b.md", "b"]), version: "b".repeat(64) },
+    { id: JSON.stringify(["workspace", "a.md", "a"]), version: "a".repeat(64) }, { id: JSON.stringify(["workspace", "c.md", "c"]), version: "a".repeat(64) }, { id: JSON.stringify(["workspace", "b.md", "b"]), version: "b".repeat(64) },
   ] });
   for (const privateValue of [request.input.session_id, request.input.prompt, "private excerpt", "Title", "/docs/"]) assert.equal(raw.includes(privateValue), false);
 });
@@ -99,7 +100,7 @@ for (const host of ["codex", "copilot"]) {
     cpSync(resolve("runtime/hooks/run.mjs"), join(installed, "runtime/hooks/run.mjs"));
     writeFileSync(join(workspace, "matches.json"), JSON.stringify({ matches }));
     writeFileSync(join(installed, "runtime/rag/run.mjs"), 'import { readFileSync } from "node:fs"; import { join } from "node:path"; for await (const chunk of process.stdin) {} process.stdout.write(readFileSync(join(process.argv[3], "matches.json")));');
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
     const session = host === "codex" ? { session_id: "thread-one" } : { sessionId: "thread-one" };
     const original = "Original transformed prompt\nwith preserved formatting.";
     const run = (event, fields = {}) => {
@@ -157,7 +158,7 @@ test("worker timeout is bounded and native model failures leave hooks usable", a
   assert.ok(performance.now() - started < 1500);
   mkdirSync(join(path, ".geist"));
   writeFileSync(join(path, ".geist", "config.toml"), "[rag]\nenabled=true\ntimeout_ms=100\n");
-  const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+  const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
   for (const host of ["codex", "copilot"]) {
     const result = spawnSync(process.execPath, [resolve("runtime/hooks/run.mjs"), host, "UserPromptSubmit"], {
       env: environment, input: JSON.stringify({ cwd: path, prompt: "database" }), encoding: "utf8", timeout: 2000,

@@ -11,7 +11,7 @@ type Entry = { record: RecordData; chunks: MarkdownChunk[]; vectors: number[][] 
 type Snapshot = { format: string; model: string; root: string; entries: Entry[] };
 export type Refresh = { total: number; updated: number; reused: number; removed: number; warnings: string[] };
 export type SearchOptions = Filters & { limit?: number; include_inactive?: boolean };
-export type Match = { id: string; version: string; title: string; path: string; score: number; excerpt: string; chunk_id: string; chunk_version: string; content: string; headings: string[]; metadata: Record<string, string>; start: number; end: number };
+export type Match = { store: "workspace" | "global"; id: string; version: string; title: string; path: string; score: number; excerpt: string; chunk_id: string; chunk_version: string; content: string; headings: string[]; metadata: Record<string, string>; start: number; end: number };
 
 export function chunksFor(record: RecordData): MarkdownChunk[] {
   return chunkMarkdown(record.body, record.title);
@@ -29,7 +29,7 @@ export class DocumentCache {
   async refresh(rebuild = false): Promise<{ entries: Entry[]; refresh: Refresh }> {
     const config = this.store.config;
     return withLock(config, "index", async () => {
-      const path = safePath(config.workspace, join(config.cacheDirectory, "documents.json"));
+      const path = safePath(config.cacheRoot, join(config.cacheDirectory, "documents.json"));
       let previous: Entry[] = [];
       let compatible = false;
       if (!rebuild && existsSync(path)) {
@@ -75,7 +75,7 @@ export class DocumentCache {
       }
       const snapshot: Snapshot = { format: FORMAT, model: this.embedder.signature, root: config.root, entries };
       if (!compatible || rebuild || updated || removed || previous.length !== entries.length) atomicWrite(path, JSON.stringify(snapshot));
-      const dirty = safePath(config.workspace, join(config.cacheDirectory, "dirty.json"));
+      const dirty = safePath(config.cacheRoot, join(config.cacheDirectory, "dirty.json"));
       if (existsSync(dirty)) unlinkSync(dirty);
       return { entries, refresh: { total: entries.length, updated, reused, removed, warnings } };
     });
@@ -100,7 +100,7 @@ export class DocumentCache {
         const dot = candidate.reduce((sum, value, offset) => sum + value * vector[offset], 0);
         const norm = Math.sqrt(candidate.reduce((sum, value) => sum + value * value, 0) * vector.reduce((sum, value) => sum + value * value, 0));
         const score = norm ? dot / norm : 0;
-        return [{ id: entry.record.id, version: entry.record.version, title: entry.record.title,
+        return [{ store: this.store.config.store, id: entry.record.id, version: entry.record.version, title: entry.record.title,
           path: this.store.path(entry.record.id), score: Math.round(score * 1e6) / 1e6,
           chunk_id: chunk.id, chunk_version: chunk.version, content: chunk.text, headings: chunk.headings, metadata: chunk.metadata,
           start: chunk.start, end: chunk.end, excerpt: chunk.text.replace(/\s+/g, " ").slice(0, 240) }];

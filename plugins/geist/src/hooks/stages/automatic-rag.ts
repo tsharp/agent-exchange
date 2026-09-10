@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readRagConfig, type RagConfig } from "../../rag/config.ts";
+import { automaticConfig, type RagConfig } from "../../rag/config.ts";
 import type { Match } from "../../rag/cache.ts";
 import { appendContext, stringField, type HookStage } from "../pipeline.ts";
 import { deliverHints, resetDelivery } from "./rag-delivery.ts";
@@ -45,7 +45,7 @@ export const automaticRag: HookStage = {
   async run(request, response) {
     if (!["UserPromptSubmit", "SessionStart", "SessionEnd", "PreCompact"].includes(request.event)) return;
     try {
-      const config = readRagConfig(request.workspace);
+      const config = automaticConfig(request.workspace);
       if (!config.enabled) return;
       if (request.event !== "UserPromptSubmit") {
         if (request.event !== "SessionStart" || request.input.source !== "resume") await resetDelivery(config, request);

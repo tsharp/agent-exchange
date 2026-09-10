@@ -1,7 +1,7 @@
 ---
 kind: plan
 state: active
-version: 2026-09-09
+version: 2026-09-10
 ---
 # Geist RAG v1
 
@@ -34,11 +34,11 @@ max_context_chars = 1800
 timeout_ms = 4000
 ```
 
-Both tables are optional. RAG is disabled by default. Instruction paths remain relative to the TOML directory. The record root is relative to the active workspace and must remain inside it. Existing `GEIST_CONFIG_FILE` and `GEIST_WORKSPACE_DIR` overrides apply.
+Both tables are optional in each store. RAG is disabled by default. Instruction paths remain relative to the TOML directory. The record root is relative to the active workspace and must remain inside it. Existing `GEIST_CONFIG_FILE` and `GEIST_WORKSPACE_DIR` overrides apply.
 
 Ranges: `top_k` 1–20; `min_score` 0–1; `max_context_chars` 256–8000; `timeout_ms` 100–4500. Unknown RAG keys fail validation. Disabled RAG performs no retrieval work.
 
-Store the cache at `.geist/cache/rag/documents.json`. Keep the downloaded model in the prepared plugin's `models/` directory. Pin `Xenova/all-MiniLM-L6-v2` revision `751bff37182d3f1213fa05d7196b954e230abad9`, quantized ONNX, CPU execution, normalized mean pooling. Model, chunker, and cache schema changes invalidate embeddings.
+Store all caches under the user data directory, default `~/.geist`, overridable with `GEIST_USER_DIR`. Workspace snapshots live at `cache/<repo-id>/rag/documents.json`; global snapshots at `cache/global/rag/documents.json`. The repository ID is SHA-256 of the canonical absolute workspace path, case-folded on Windows. No Git repository is required; moving a workspace creates a new identity. Old local caches are ignored and can be removed manually. Keep the downloaded model in the prepared plugin's `models/` directory. Pin `Xenova/all-MiniLM-L6-v2` revision `751bff37182d3f1213fa05d7196b954e230abad9`, quantized ONNX, CPU execution, normalized mean pooling. Model, chunker, and cache schema changes invalidate embeddings.
 
 Ship bundled hooks, CLI, and MCP entry points. The explicit `prepare_runtime` MCP tool (or setup script) installs pinned native/runtime dependencies and downloads the pinned model. It verifies a real embedding, reuses prepared assets offline, shares concurrent preparation within one server, and allows search to recover without restarting MCP. Installer output stays off protocol stdout. Hooks and searches never invoke npm or download models. MCP starts without loading the model; record tools work before preparation. Preparation changes neither workspace configuration nor records.
 
@@ -46,9 +46,15 @@ Codex loads root `plugin.json` and typed `mcp.json` using the Agent Plugins 1.0 
 
 Codex 0.153.4 explicitly skips hook loading for portable plugins. Keep the working portable MCP package and provide `scripts/setup-codex-hooks.mjs install|remove` as a temporary user-hook registration workaround. It preserves unrelated hooks, replaces its previous registrations on update, and never grants trust. Remove these registrations before plugin uninstall or migration to native portable-hook discovery. Marketplace installation alone does not activate hooks on this host version.
 
+### Global store and instructions
+
+Treat the user directory as the root of a second store. Read its configuration from `~/.geist/config.toml`, its instructions relative to that file, and its default records from `~/.geist/docs/`. Global instructions precede local instructions, retaining each TOML array's order. `GEIST_CONFIG_FILE` affects only the workspace configuration. Enable automatic global and workspace retrieval independently; a global-only setup works without project configuration. Combine enabled stores under the enabled workspace's top_k/text/deadline budgets, otherwise the global budgets. Each store applies its own minimum score.
+
+Initialize the user directory with `docs/`, `temp/`, and a preserved/appended `.gitignore` excluding `/cache/` and `/temp/`. Configuration, instructions, and records remain suitable for checking in. Do not initialize, commit, or synchronize Git. Keep `.geist/cache/` and `.geist/temp/` ignored in consuming repositories too. Reject linked cache paths against the user data root, independently of workspace record containment.
+
 ## Records
 
-Default root: `docs/`. Recursively scan `.md` files, including hidden directories. Directory names have no semantic meaning. IDs use `/`, end in `.md`, and contain no empty, `.` or `..` components. Reject absolute paths, Windows alternate streams, and symlink/junction files or directories. Apply containment checks to discovery, reads, and writes. IDs compare case-sensitively; creation also respects filesystem collision rules.
+Default root: `docs/`. Recursively scan `.md` files, including hidden directories. Directory names have no semantic meaning. IDs use `/`, end in `.md`, and contain no empty, `.` or `..` components. Reject absolute paths, Windows alternate streams, and symlink/junction files or directories. Apply containment checks to discovery, reads, and writes. IDs are scoped by store (workspace or global), and compare case-sensitively; creation also respects filesystem collision rules.
 
 Records are UTF-8 Markdown with optional YAML frontmatter at the beginning. Limits: 256 KiB per record and 2000 records per store. Exclude invalid records from scans with warnings; direct reads fail. A missing root lists as empty and can be created by the first write.
 
@@ -80,19 +86,19 @@ Use the [Markdown chunking contract](../../plugins/geist/docs/chunking.md): sect
 
 Search defaults to active or omitted state. Explicit state filters can select any state; `include_inactive` allows all states. Kind/state/scope filters use exact strings, OR within a filter and AND across filters. Scopes imply no hierarchy. Listing includes all states.
 
-Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Never automatically fetch full bodies into the prompt. Automatic retrieval uses the first 4000 prompt characters. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
+Inject hints as JSON wrapped in an untrusted-reference label. Include fewer than top_k when score or character budgets exclude results. Inject selected chunk bodies without expanding results to their complete records. Automatic retrieval uses the first 4000 prompt characters. Missing models, retrieval errors, locks, and timeouts fail open with short stderr diagnostics. A subprocess deadline bounds prompt-time scanning and inference. Prepare large changes explicitly with the index command.
 
 ### Session delivery
 
-For automatic hints, remember the last emitted version of each chunk within a host, workspace, record root, and session. Select the normal top_k results first, then suppress unchanged chunks already emitted; do not fill the gaps with lower-ranked results. Mark only hints that fit the output budget. Changed chunks and new sessions are eligible again. Explicit MCP/CLI search remains unaffected.
+For automatic hints, remember the last emitted version of each chunk within a host, workspace, both record roots, and session. Select the normal top_k results first, then suppress unchanged chunks already emitted; do not fill the gaps with lower-ranked results. Mark only hints that fit the output budget. Changed chunks and new sessions are eligible again. Explicit MCP/CLI search remains unaffected.
 
-Store only record/chunk identities and chunk version hashes in `.geist/cache/rag/sessions/`, using a hash of the host, record root, and session identity as the filename. No prompts, excerpts, conversation content, or raw session IDs enter this delivery state. Keep at most the latest 2000 chunk entries per session. Missing/corrupt state starts fresh. Without a session ID, retain stateless hints. SessionEnd removes the session's state; orphaned state can be deleted with the cache.
+Store only store/record/chunk identities and chunk version hashes in `~/.geist/cache/<repo-id>/rag/sessions/`, including global deliveries. Use a hash of the host, workspace, both record roots, and session identity as the filename. No prompts, excerpts, conversation content, or raw session IDs enter this delivery state. Keep at most the latest 2000 chunk entries per session. Missing/corrupt state starts fresh. Without a session ID, retain stateless hints. SessionEnd removes the session's state; orphaned state can be deleted with the cache.
 
 Reset delivery state on fresh/cleared sessions and compaction, but preserve it on resume while it exists. Codex uses `SessionStart` with source `compact` or `clear`; Copilot uses `preCompact`. Copilot prompt hints use `userPromptTransformed` and preserve the original transformed prompt. Delivery runs after successful optional stages/controllers, so blocking or failed processing does not consume hints. Metadata records hook emission, not confirmation that the host or model consumed the hints.
 
 ## MCP and CLI
 
-The local stdio MCP server is named `geist`. Tools expose input schemas and structured JSON results plus matching text JSON. Domain errors return `isError`, a code, and message: invalid_config, invalid_id, invalid_record, not_found, already_exists, conflict, busy, model_unavailable, or io_error.
+The local stdio MCP server is named `geist`. Listing, search, and rebuild accept `store: workspace|global|all` (default all). Reads, writes, deletion, and links accept `store: workspace|global` (default workspace). Explicit operations can access disabled stores; enabled controls automatic retrieval. Results identify their store, and links remain within that store. Combined operations deduplicate equal physical record roots; listing sorts by store then ID, and search by score, store, ID, and chunk offset. Restart MCP to reload configuration. Tools expose input schemas and structured JSON results plus matching text JSON. Domain errors return `isError`, a code, and message: invalid_config, invalid_id, invalid_record, not_found, already_exists, conflict, busy, model_unavailable, or io_error.
 
 | Tool | Input | Result |
 | --- | --- | --- |
@@ -104,11 +110,11 @@ The local stdio MCP server is named `geist`. Tools expose input schemas and stru
 | update_record | id, complete raw markdown, expected_version | Updated record; missing or changed records fail |
 | delete_record | id, expected_version | Deleted ID and cache invalidation status |
 | get_links | id | Incoming/outgoing edges with source, target, optional kind, resolved status |
-| rebuild_cache | No arguments | Refresh counts and warnings |
+| rebuild_cache | Optional store | Refresh counts and warnings |
 
 Updates replace the complete document. Read first, retain unknown metadata, and supply its version hash. Write temporary sibling files and publish atomically; create exclusively. Serialize cooperating writers. Version checks detect intervening edits but cannot prevent an external editor racing in the final check/publication interval. Deletion leaves other records and unresolved links intact. Git operations remain external.
 
-CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when launched outside the consuming project.
+CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when launched outside the consuming project. Index/rebuild/search default to both stores and accept `--store workspace|global|all` after the workspace argument.
 
 ## Acceptance criteria
 
@@ -123,9 +129,9 @@ CLI commands: prepare, index, rebuild, search. Accept an explicit workspace when
 
 ## Implementation validation
 
-The structured chunking extension adds Markdown/annotation fixtures, stable-identity and vector-reuse checks, and chunk-level delivery regressions. The following v1 measurements describe the earlier document-level implementation.
+The structured chunking and user-store extensions add Markdown/annotation fixtures, stable-identity and vector-reuse checks, chunk-level delivery regressions, global instructions, store-scoped MCP operations, centralized cache containment, and shared global embeddings. Windows validation passes 63 standard tests and real ONNX checks, including global-only retrieval of different sections in one session and fresh MCP preparation. Linux was not run locally. The following v1 measurements describe the earlier document-level implementation.
 
-The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its document cache and prepared model remain local and ignored by Git.
+The v1 implementation is available in `plugins/geist`. The repository enables retrieval over `docs/` in `.geist/config.toml`; its caches now live in the user data directory and its prepared model remains in the plugin, both ignored by Git.
 
 Windows validation passes 52 standard tests covering instructions, copied hook installations, records, cache behavior, MCP, prompt budgets, lock recovery, and session deduplication. Two explicit ONNX integration tests verify semantic ranking, both prompt adapters, repeated/edited documents, compaction resets, refresh/rebuild, and a cold installed MCP server recovering from unavailable search through concurrent preparation calls without restarting. Repeated preparation succeeds without the setup script. The four-document fixture indexed in about 214 ms, searched in 201 ms, and completed initial prompt hooks in about 310 ms. These are small-corpus smoke measurements, not a latency guarantee.
 

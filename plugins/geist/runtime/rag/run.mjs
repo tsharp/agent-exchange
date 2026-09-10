@@ -7359,7 +7359,9 @@ var require_dist = __commonJS({
 });
 
 // src/rag/config.ts
-import { existsSync, readFileSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, lstatSync, realpathSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 // ../../node_modules/smol-toml/dist/date.js
@@ -8282,10 +8284,38 @@ function safePath(root, path) {
   }
   return target;
 }
-function readRagConfig(workspace2) {
+function userDataDirectory() {
+  return resolve(process.env.GEIST_USER_DIR?.trim() || join(homedir(), ".geist"));
+}
+function initializeUserData() {
+  const directory = userDataDirectory();
+  let ancestor = dirname(directory);
+  while (!existsSync(ancestor)) ancestor = dirname(ancestor);
+  safePath(realpathSync(ancestor), directory);
+  mkdirSync(directory, { recursive: true });
+  for (const child of ["docs", "temp"]) mkdirSync(safePath(directory, join(directory, child)), { recursive: true });
+  const ignore = safePath(directory, join(directory, ".gitignore"));
+  try {
+    writeFileSync(ignore, "/cache/\n/temp/\n", { flag: "wx" });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    const existing = readFileSync(ignore, "utf8");
+    const missing = ["/cache/", "/temp/"].filter((line) => !existing.split(/\r?\n/).includes(line));
+    if (missing.length) appendFileSync(ignore, `${existing.endsWith("\n") ? "" : "\n"}${missing.join("\n")}
+`);
+  }
+  return realpathSync(directory);
+}
+function repositoryId(workspace2) {
+  const path = realpathSync(resolve(workspace2));
+  return createHash("sha256").update(process.platform === "win32" ? path.toLowerCase() : path).digest("hex");
+}
+function readRagConfig(workspace2, store = "workspace") {
+  const cacheRoot = initializeUserData();
+  if (store === "global") workspace2 = cacheRoot;
   workspace2 = realpathSync(resolve(workspace2));
-  const selected = process.env.GEIST_CONFIG_FILE?.trim();
-  const configPath = selected || join(workspace2, ".geist", "config.toml");
+  const selected = store === "workspace" ? process.env.GEIST_CONFIG_FILE?.trim() : void 0;
+  const configPath = selected || (store === "global" ? join(workspace2, "config.toml") : join(workspace2, ".geist", "config.toml"));
   let raw = {};
   try {
     if (selected || existsSync(configPath)) raw = parse(readFileSync(configPath, "utf8"));
@@ -8311,12 +8341,14 @@ function readRagConfig(workspace2) {
   const recordRoot = rag.root ?? "docs";
   if (typeof recordRoot !== "string" || !recordRoot.trim() || isAbsolute(recordRoot)) throw new RagError("invalid_config", "rag.root must be a workspace-relative directory");
   const root = safePath(workspace2, resolve(workspace2, recordRoot));
-  const cacheDirectory = safePath(workspace2, join(workspace2, ".geist", "cache", "rag"));
+  const cacheDirectory = safePath(cacheRoot, join(cacheRoot, "cache", store === "global" ? "global" : repositoryId(workspace2), "rag"));
   if (inside(root, cacheDirectory)) throw new RagError("invalid_config", "Record root must not contain the derived cache");
   return {
     workspace: workspace2,
     root,
     cacheDirectory,
+    cacheRoot,
+    store,
     enabled: rag.enabled === true,
     topK: number("top_k", 3, 1, 20),
     minScore: number("min_score", 0.25, 0, 1, false),
@@ -8324,11 +8356,552 @@ function readRagConfig(workspace2) {
     timeoutMs: number("timeout_ms", 4e3, 100, 4500)
   };
 }
+function storeConfigs(workspace2) {
+  const local = readRagConfig(workspace2);
+  const global = readRagConfig(workspace2, "global");
+  return [local, global];
+}
+function automaticConfig(workspace2) {
+  const local = readRagConfig(workspace2);
+  const global = readRagConfig(workspace2, "global");
+  return local.enabled ? local : { ...global, workspace: local.workspace, cacheDirectory: local.cacheDirectory };
+}
+
+// src/rag/cache.ts
+import { existsSync as existsSync3, readFileSync as readFileSync4, unlinkSync as unlinkSync3 } from "node:fs";
+import { join as join4 } from "node:path";
+
+// src/rag/files.ts
+import { closeSync, mkdirSync as mkdirSync2, openSync, readFileSync as readFileSync2, renameSync, unlinkSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname2, join as join2 } from "node:path";
+import { randomUUID } from "node:crypto";
+function atomicWrite(path, content) {
+  const temp = join2(dirname2(path), `.${randomUUID()}.tmp`);
+  try {
+    writeFileSync2(temp, content, { flag: "wx" });
+    renameSync(temp, path);
+  } finally {
+    try {
+      unlinkSync(temp);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+}
+async function withLock(config, name, action) {
+  safePath(config.cacheRoot, config.cacheDirectory);
+  mkdirSync2(config.cacheDirectory, { recursive: true });
+  const path = safePath(config.cacheRoot, join2(config.cacheDirectory, `${name}.lock`));
+  let descriptor;
+  try {
+    descriptor = openSync(path, "wx");
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    const reclaim = safePath(config.cacheRoot, `${path}.reclaim`);
+    let guard;
+    try {
+      guard = openSync(reclaim, "wx");
+    } catch {
+      throw new RagError("busy", `Geist ${name} lock recovery is busy; retry or inspect the recovery file`);
+    }
+    try {
+      let abandoned = false;
+      try {
+        const { pid } = JSON.parse(readFileSync2(path, "utf8"));
+        if (Number.isInteger(pid) && pid > 0) {
+          try {
+            process.kill(pid, 0);
+          } catch (probe) {
+            abandoned = probe.code === "ESRCH";
+          }
+        }
+      } catch {
+      }
+      if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
+      try {
+        unlinkSync(path);
+        descriptor = openSync(path, "wx");
+      } catch {
+        throw new RagError("busy", `Geist ${name} lock changed; retry`);
+      }
+    } finally {
+      closeSync(guard);
+      unlinkSync(reclaim);
+    }
+  }
+  try {
+    writeFileSync2(descriptor, JSON.stringify({ pid: process.pid }));
+    return await action();
+  } finally {
+    closeSync(descriptor);
+    unlinkSync(path);
+  }
+}
+
+// src/rag/records.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { existsSync as existsSync2, linkSync, mkdirSync as mkdirSync3, readFileSync as readFileSync3, readdirSync, statSync, unlinkSync as unlinkSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { createHash as createHash2, randomUUID as randomUUID2 } from "node:crypto";
+import { dirname as dirname3, join as join3, resolve as resolve2 } from "node:path";
+var MAX_RECORD_BYTES = 256 * 1024;
+var hash = (value) => createHash2("sha256").update(value).digest("hex");
+function validateId(id) {
+  if (!id || !id.endsWith(".md") || /[\\:\x00-\x1f]/.test(id) || id.split("/").some((part) => !part || part === "." || part === ".." || /[. ]$/.test(part))) {
+    throw new RagError("invalid_id", "Record IDs must be relative forward-slash .md paths");
+  }
+  return id;
+}
+function object(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function parseRecord(id, markdown) {
+  validateId(id);
+  if (Buffer.byteLength(markdown) > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record exceeds 256 KiB");
+  let body = markdown.replace(/^\uFEFF/, "");
+  let frontmatter = {};
+  if (/^---\r?\n/.test(body)) {
+    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(body);
+    if (!match) throw new RagError("invalid_record", "Unclosed YAML frontmatter");
+    try {
+      const document = (0, import_yaml.parseDocument)(match[1]);
+      if (document.errors.length) throw new Error("Malformed YAML");
+      const parsed = document.toJS({ maxAliasCount: 50 });
+      if (!object(parsed)) throw new Error("Frontmatter must be a mapping");
+      frontmatter = parsed;
+      JSON.stringify(frontmatter);
+    } catch {
+      throw new RagError("invalid_record", "Invalid YAML frontmatter mapping");
+    }
+    body = body.slice(match[0].length);
+  }
+  for (const field of ["kind", "state"]) {
+    if (frontmatter[field] !== void 0 && typeof frontmatter[field] !== "string") throw new RagError("invalid_record", `${field} must be a string`);
+  }
+  if (frontmatter.scope !== void 0 && (!Array.isArray(frontmatter.scope) || frontmatter.scope.some((item) => typeof item !== "string"))) {
+    throw new RagError("invalid_record", "scope must be a string list");
+  }
+  const links = frontmatter.links ?? [];
+  const sources = frontmatter.sources ?? [];
+  if (!Array.isArray(links) || links.some((link) => !object(link) || typeof link.record !== "string" || link.kind !== void 0 && typeof link.kind !== "string")) {
+    throw new RagError("invalid_record", "links must contain record IDs and optional string kinds");
+  }
+  for (const link of links) validateId(link.record);
+  if (!Array.isArray(sources) || sources.some((source) => !object(source) || typeof source.source !== "string" || source.date !== void 0 && (typeof source.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(source.date) || !Number.isFinite(Date.parse(source.date)) || new Date(source.date).toISOString().slice(0, 10) !== source.date))) {
+    throw new RagError("invalid_record", "sources must contain source strings and optional ISO dates");
+  }
+  return {
+    id,
+    title: /^#\s+(.+)$/m.exec(body)?.[1].trim() || id,
+    body,
+    markdown,
+    frontmatter,
+    links,
+    sources,
+    version: hash(markdown)
+  };
+}
+function matches(record, filters) {
+  if (filters.prefix && !record.id.startsWith(filters.prefix)) return false;
+  for (const field of ["kind", "state"]) {
+    if (filters[field]?.length && !filters[field].includes(record.frontmatter[field])) return false;
+  }
+  return !filters.scope?.length || filters.scope.some((scope) => record.frontmatter.scope?.includes(scope));
+}
+var RecordStore = class {
+  config;
+  constructor(config) {
+    this.config = config;
+  }
+  path(id) {
+    return safePath(this.config.workspace, resolve2(this.config.root, validateId(id)));
+  }
+  get(id) {
+    const path = this.path(id);
+    try {
+      if (!statSync(path).isFile() || statSync(path).size > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record is not a file or exceeds 256 KiB");
+      let markdown;
+      try {
+        markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync3(path));
+      } catch (error) {
+        if (error.code === "ERR_ENCODING_INVALID_ENCODED_DATA") throw new RagError("invalid_record", "Record must contain valid UTF-8");
+        throw error;
+      }
+      return parseRecord(id, markdown);
+    } catch (error) {
+      if (error.code === "ENOENT") throw new RagError("not_found", `Record not found: ${id}`);
+      throw error;
+    }
+  }
+  scan() {
+    safePath(this.config.workspace, this.config.root);
+    const records = [], warnings = [];
+    let count = 0;
+    const visit = (directory, prefix) => {
+      for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) {
+        const id = prefix + entry.name;
+        if (entry.isSymbolicLink()) {
+          warnings.push(`Skipped linked path: ${id}`);
+          continue;
+        }
+        if (entry.isDirectory()) {
+          safePath(this.config.workspace, join3(directory, entry.name));
+          visit(join3(directory, entry.name), `${id}/`);
+        } else if (entry.name.endsWith(".md")) {
+          if (++count > 2e3) throw new RagError("invalid_record", "Store exceeds the v1 limit of 2000 records");
+          try {
+            records.push(this.get(id));
+          } catch {
+            warnings.push(`Skipped invalid record: ${id}`);
+          }
+        }
+      }
+    };
+    if (existsSync2(this.config.root)) visit(this.config.root, "");
+    return { records, warnings };
+  }
+  async write(id, markdown, expectedVersion) {
+    const parsed = parseRecord(id, markdown);
+    return withLock(this.config, "records", () => {
+      const path = this.path(id);
+      if (expectedVersion !== void 0) {
+        if (this.get(id).version !== expectedVersion) throw new RagError("conflict", "Record changed; read it again before updating");
+        atomicWrite(path, markdown);
+      } else {
+        mkdirSync3(dirname3(path), { recursive: true });
+        safePath(this.config.workspace, path);
+        const temp = join3(dirname3(path), `.${randomUUID2()}.tmp`);
+        try {
+          writeFileSync3(temp, markdown, { flag: "wx" });
+          linkSync(temp, path);
+        } catch (error) {
+          if (error.code === "EEXIST") throw new RagError("already_exists", `Record already exists: ${id}`);
+          throw error;
+        } finally {
+          if (existsSync2(temp)) unlinkSync2(temp);
+        }
+      }
+      this.invalidate();
+      return parsed;
+    });
+  }
+  async delete(id, expectedVersion) {
+    await withLock(this.config, "records", () => {
+      if (this.get(id).version !== expectedVersion) throw new RagError("conflict", "Record changed; read it again before deleting");
+      unlinkSync2(this.path(id));
+      this.invalidate();
+    });
+  }
+  invalidate() {
+    atomicWrite(safePath(this.config.cacheRoot, join3(this.config.cacheDirectory, "dirty.json")), JSON.stringify({ dirty: true }));
+  }
+  links(id) {
+    this.get(id);
+    const { records, warnings } = this.scan();
+    const ids = new Set(records.map((record) => record.id));
+    const edges = records.flatMap((record) => record.links.map((link) => ({
+      source: record.id,
+      target: link.record,
+      ...link.kind ? { kind: link.kind } : {},
+      resolved: ids.has(link.record)
+    })));
+    return { outgoing: edges.filter((edge) => edge.source === id), incoming: edges.filter((edge) => edge.target === id), warnings };
+  }
+};
+
+// src/rag/chunking.ts
+import { createHash as createHash3 } from "node:crypto";
+var CHUNKER_SIGNATURE = "geist-markdown-v1:body800:context200";
+var digest = (text) => createHash3("sha256").update(text).digest("hex");
+function attributes(value) {
+  const fields = [];
+  let start = 0, depth = 0, quote = "";
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    if (quote) {
+      if (c === quote && value[i - 1] !== "\\") quote = "";
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "[" || c === "{") depth++;
+    else if (c === "]" || c === "}") depth--;
+    else if (!depth && (c === ";" || c === ",")) {
+      fields.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  fields.push(value.slice(start));
+  const result = /* @__PURE__ */ Object.create(null);
+  for (const field of fields) {
+    const pair = /^\s*([\w.-]+)\s*[:=]\s*([\s\S]*?)\s*$/.exec(field);
+    if (pair) result[pair[1]] = pair[2];
+    else if (field.trim()) result.name = field.trim();
+  }
+  return result;
+}
+function chunkMarkdown(markdown, title = "") {
+  const lines = [...markdown.matchAll(/[^\n]*\n|[^\n]+$/g)].map((m) => ({
+    text: m[0].replace(/\r?\n$/, ""),
+    start: m.index,
+    end: m.index + m[0].length
+  }));
+  let first = 0;
+  if (lines[0]?.text.replace(/^\uFEFF/, "") === "---") {
+    const closing = lines.findIndex((line, i) => i > 0 && line.text === "---");
+    if (closing >= 0) first = closing + 1;
+  }
+  const chunks = [];
+  const headings = [];
+  const sections = [];
+  let blockMetadata = {};
+  let pendingStart = -1, pendingEnd = -1;
+  function emit(start, end) {
+    const text = markdown.slice(start, end);
+    if (!text.trim()) return;
+    const path = headings.map((h) => h.text);
+    const metadata = Object.assign({}, ...headings.map((h) => h.metadata), blockMetadata, ...sections.map((s) => s.metadata));
+    const context = [title, ...path.filter((h) => h !== title)].filter(Boolean).join(" > ").slice(0, 200);
+    const embeddingText = context ? `${context}
+${text}` : text;
+    const version = digest(JSON.stringify([CHUNKER_SIGNATURE, title, path, Object.entries(metadata).sort(([a], [b]) => a.localeCompare(b)), text]));
+    chunks.push({ id: version, version, text, embeddingText, headings: path, metadata, start, end });
+  }
+  function flush() {
+    if (pendingStart >= 0) emit(pendingStart, pendingEnd);
+    pendingStart = pendingEnd = -1;
+  }
+  function block(start, end) {
+    if (pendingStart >= 0 && end - pendingStart > 800) flush();
+    if (end - start <= 800) {
+      if (pendingStart < 0) pendingStart = start;
+      pendingEnd = end;
+      return;
+    }
+    flush();
+    while (end - start > 800) {
+      let stop = start + 800;
+      const window = markdown.slice(start, stop);
+      const boundary = Math.max(window.lastIndexOf("\n"), window.lastIndexOf(" "));
+      if (boundary >= 400) stop = start + boundary + 1;
+      if (/[\uD800-\uDBFF]/.test(markdown[stop - 1])) stop--;
+      emit(start, stop);
+      start = stop;
+    }
+    if (start < end) {
+      pendingStart = start;
+      pendingEnd = end;
+    }
+  }
+  for (let i = first; i < lines.length; ) {
+    const line = lines[i];
+    const section = /^\s*<!--\s*section:\s*(.*?)\s*-->\s*$/.exec(line.text);
+    if (section) {
+      flush();
+      blockMetadata = {};
+      sections.push({ metadata: attributes(section[1]), headings: [...headings] });
+      i++;
+      continue;
+    }
+    if (/^\s*<!--\s*\/section\s*-->\s*$/.test(line.text)) {
+      flush();
+      blockMetadata = {};
+      const closed = sections.pop();
+      if (closed) headings.splice(0, headings.length, ...closed.headings);
+      i++;
+      continue;
+    }
+    const annotation = /^\s*<!--\s*([\w.-]+\s*[:=][\s\S]*?)\s*-->\s*$/.exec(line.text);
+    if (annotation) {
+      flush();
+      blockMetadata = attributes(annotation[1]);
+      i++;
+      continue;
+    }
+    const atx = /^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$/.exec(line.text);
+    const setext = i + 1 < lines.length && line.text.trim() && !/^\s*(?:[-*+]\s|>|`|~|<)/.test(line.text) ? /^ {0,3}(=+|-+)[ \t]*$/.exec(lines[i + 1].text) : null;
+    if (atx || setext) {
+      flush();
+      const level = atx ? atx[1].length : setext[1][0] === "=" ? 1 : 2;
+      let text = atx ? (atx[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "") : line.text.trim();
+      const inline = /\s*<!--\s*(.*?)\s*-->\s*$/.exec(text);
+      const metadata = inline ? attributes(inline[1]) : {};
+      if (inline) text = text.slice(0, inline.index).trim();
+      while (headings.length && headings.at(-1).level >= level) headings.pop();
+      headings.push({ level, text, metadata });
+      block(line.start, lines[i + (setext ? 1 : 0)].end);
+      i += setext ? 2 : 1;
+      continue;
+    }
+    if (/^ {0,3}(?:(?:\*\s*){3,}|(?:_\s*){3,}|(?:-\s*){3,})$/.test(line.text)) {
+      flush();
+      blockMetadata = {};
+      i++;
+      continue;
+    }
+    if (!line.text.trim()) {
+      if (pendingStart >= 0) pendingEnd = line.end - pendingStart <= 800 ? line.end : pendingEnd;
+      i++;
+      continue;
+    }
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line.text);
+    let j = i + 1;
+    if (fence && !(fence[1][0] === "`" && fence[2].includes("`"))) {
+      const close = new RegExp(`^ {0,3}${fence[1][0]}{${fence[1].length},}[ \\t]*$`);
+      while (j < lines.length && !close.test(lines[j].text)) j++;
+      if (j < lines.length) j++;
+    } else if (/^\s*<!--/.test(line.text) && !line.text.includes("-->")) {
+      while (j < lines.length && !lines[j].text.includes("-->")) j++;
+      if (j < lines.length) j++;
+    } else {
+      while (j < lines.length && lines[j].text.trim() && !/^ {0,3}(?:#{1,6}(?:\s|$)|`{3,}|~{3,}|<!--|(?:(?:\*\s*){3,}|(?:_\s*){3,}|(?:-\s*){3,})$)/.test(lines[j].text) && !(j + 1 < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[j + 1].text))) j++;
+    }
+    block(line.start, lines[j - 1].end);
+    if (Object.keys(blockMetadata).length) {
+      flush();
+      blockMetadata = {};
+    }
+    i = j;
+  }
+  flush();
+  return chunks;
+}
+
+// src/rag/cache.ts
+var FORMAT = `geist-chunk-cache-v2:${CHUNKER_SIGNATURE}`;
+function chunksFor(record) {
+  return chunkMarkdown(record.body, record.title);
+}
+function validVectors(value, count) {
+  return Array.isArray(value) && value.length === count && value.every((vector) => Array.isArray(vector) && vector.length > 0 && vector.length === value[0].length && vector.every((number) => typeof number === "number" && Number.isFinite(number)));
+}
+var DocumentCache = class {
+  store;
+  embedder;
+  constructor(store, embedder) {
+    this.store = store;
+    this.embedder = embedder;
+  }
+  async refresh(rebuild = false) {
+    const config = this.store.config;
+    return withLock(config, "index", async () => {
+      const path = safePath(config.cacheRoot, join4(config.cacheDirectory, "documents.json"));
+      let previous = [];
+      let compatible = false;
+      if (!rebuild && existsSync3(path)) {
+        try {
+          const saved = JSON.parse(readFileSync4(path, "utf8"));
+          if (saved.format === FORMAT && saved.model === this.embedder.signature && saved.root === config.root && Array.isArray(saved.entries)) {
+            previous = saved.entries;
+            compatible = true;
+          }
+        } catch {
+        }
+      }
+      const old = new Map(previous.filter((entry) => entry?.record?.id).map((entry) => [entry.record.id, entry]));
+      const { records, warnings } = this.store.scan();
+      const entries = [];
+      let updated = 0, reused = 0;
+      for (const record of records) {
+        const chunks = chunksFor(record);
+        const cached = old.get(record.id);
+        if (cached?.record.version === record.version && JSON.stringify(cached.chunks) === JSON.stringify(chunks) && validVectors(cached.vectors, chunks.length)) {
+          entries.push({ record, chunks, vectors: cached.vectors });
+          reused++;
+        } else {
+          const reusable = /* @__PURE__ */ new Map();
+          if (!rebuild && cached && Array.isArray(cached.chunks) && cached.chunks.every((chunk) => chunk && typeof chunk.version === "string") && validVectors(cached.vectors, cached.chunks.length)) {
+            cached.chunks.forEach((chunk, index) => reusable.set(chunk.version, cached.vectors[index]));
+          }
+          const missing = chunks.filter((chunk) => !reusable.has(chunk.version));
+          const fresh = missing.length ? await this.embedder.embed(missing.map((chunk) => chunk.embeddingText)) : [];
+          if (missing.length && !validVectors(fresh, missing.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
+          missing.forEach((chunk, index) => reusable.set(chunk.version, fresh[index]));
+          const vectors = chunks.map((chunk) => reusable.get(chunk.version));
+          if (!validVectors(vectors, chunks.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
+          entries.push({ record, chunks, vectors });
+          updated++;
+        }
+      }
+      const ids = new Set(records.map((record) => record.id));
+      const removed = [...old.keys()].filter((id) => !ids.has(id)).length;
+      const after = this.store.scan();
+      if (JSON.stringify(after.records.map((r) => [r.id, r.version])) !== JSON.stringify(records.map((r) => [r.id, r.version]))) {
+        throw new RagError("conflict", "Records changed while indexing; retry");
+      }
+      const snapshot = { format: FORMAT, model: this.embedder.signature, root: config.root, entries };
+      if (!compatible || rebuild || updated || removed || previous.length !== entries.length) atomicWrite(path, JSON.stringify(snapshot));
+      const dirty = safePath(config.cacheRoot, join4(config.cacheDirectory, "dirty.json"));
+      if (existsSync3(dirty)) unlinkSync3(dirty);
+      return { entries, refresh: { total: entries.length, updated, reused, removed, warnings } };
+    });
+  }
+  async search(query, options = {}) {
+    if (!query.trim() || query.length > 4e3) throw new RagError("invalid_record", "Query must contain 1\u20134000 characters");
+    const limit = options.limit ?? this.store.config.topK;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw new RagError("invalid_record", "Search limit must be between 1 and 20");
+    const { entries, refresh } = await this.refresh();
+    const candidates = entries.filter(({ record }) => matches(record, options) && (options.include_inactive || options.state?.length || record.frontmatter.state === void 0 || record.frontmatter.state === "active"));
+    if (!candidates.length) return { matches: [], refresh };
+    const [vector] = await this.embedder.embed([query]);
+    if (!validVectors([vector], 1)) throw new RagError("model_unavailable", "Invalid query vector");
+    const ranked = candidates.flatMap((entry) => {
+      const seen = /* @__PURE__ */ new Set();
+      return entry.chunks.flatMap((chunk, index) => {
+        if (seen.has(chunk.id)) return [];
+        seen.add(chunk.id);
+        const candidate = entry.vectors[index];
+        if (candidate.length !== vector.length) throw new RagError("model_unavailable", "Embedding dimensions changed; rebuild the cache");
+        const dot = candidate.reduce((sum, value, offset) => sum + value * vector[offset], 0);
+        const norm = Math.sqrt(candidate.reduce((sum, value) => sum + value * value, 0) * vector.reduce((sum, value) => sum + value * value, 0));
+        const score = norm ? dot / norm : 0;
+        return [{
+          store: this.store.config.store,
+          id: entry.record.id,
+          version: entry.record.version,
+          title: entry.record.title,
+          path: this.store.path(entry.record.id),
+          score: Math.round(score * 1e6) / 1e6,
+          chunk_id: chunk.id,
+          chunk_version: chunk.version,
+          content: chunk.text,
+          headings: chunk.headings,
+          metadata: chunk.metadata,
+          start: chunk.start,
+          end: chunk.end,
+          excerpt: chunk.text.replace(/\s+/g, " ").slice(0, 240)
+        }];
+      });
+    });
+    return { matches: ranked.filter((match) => match.score >= this.store.config.minScore).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : a.start - b.start)).slice(0, limit), refresh };
+  }
+};
+
+// src/rag/library.ts
+async function searchStores(configs, embedder, query, options = {}) {
+  configs = [...new Map(configs.map((config) => [config.root, config])).values()];
+  const limit = options.limit ?? configs[0]?.topK ?? 3;
+  const results = [];
+  for (const config of configs) results.push(await new DocumentCache(new RecordStore(config), embedder).search(query, { ...options, limit }));
+  const matches2 = results.flatMap((r) => r.matches).sort((a, b) => b.score - a.score || (a.store < b.store ? -1 : a.store > b.store ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : a.start - b.start)).slice(0, limit);
+  const refresh = { total: 0, updated: 0, reused: 0, removed: 0, warnings: [] };
+  for (const result of results) {
+    for (const key of ["total", "updated", "reused", "removed"]) refresh[key] += result.refresh[key];
+    refresh.warnings.push(...result.refresh.warnings);
+  }
+  return { matches: matches2, refresh };
+}
+async function refreshStores(configs, embedder, rebuild = false) {
+  configs = [...new Map(configs.map((config) => [config.root, config])).values()];
+  const refresh = { total: 0, updated: 0, reused: 0, removed: 0, warnings: [] };
+  for (const config of configs) {
+    const result = (await new DocumentCache(new RecordStore(config), embedder).refresh(rebuild)).refresh;
+    for (const key of ["total", "updated", "reused", "removed"]) refresh[key] += result[key];
+    refresh.warnings.push(...result.warnings.map((warning) => `${config.store}: ${warning}`));
+  }
+  return refresh;
+}
 
 // src/rag/embedding.ts
-import { dirname as dirname3, resolve as resolve2 } from "node:path";
+import { dirname as dirname4, resolve as resolve3 } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync4, readFileSync as readFileSync5 } from "node:fs";
 
 // ../../node_modules/@huggingface/tokenizers/dist/tokenizers.mjs
 var DictionarySplitter = class {
@@ -11286,86 +11859,19 @@ var Tokenizer = class {
 };
 var Tokenizer_default = Tokenizer;
 
-// src/rag/files.ts
-import { closeSync, mkdirSync, openSync, readFileSync as readFileSync2, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname as dirname2, join as join2 } from "node:path";
-import { randomUUID } from "node:crypto";
-function atomicWrite(path, content) {
-  const temp = join2(dirname2(path), `.${randomUUID()}.tmp`);
-  try {
-    writeFileSync(temp, content, { flag: "wx" });
-    renameSync(temp, path);
-  } finally {
-    try {
-      unlinkSync(temp);
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  }
-}
-async function withLock(config, name, action) {
-  safePath(config.workspace, config.cacheDirectory);
-  mkdirSync(config.cacheDirectory, { recursive: true });
-  const path = safePath(config.workspace, join2(config.cacheDirectory, `${name}.lock`));
-  let descriptor;
-  try {
-    descriptor = openSync(path, "wx");
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    const reclaim = safePath(config.workspace, `${path}.reclaim`);
-    let guard;
-    try {
-      guard = openSync(reclaim, "wx");
-    } catch {
-      throw new RagError("busy", `Geist ${name} lock recovery is busy; retry or inspect the recovery file`);
-    }
-    try {
-      let abandoned = false;
-      try {
-        const { pid } = JSON.parse(readFileSync2(path, "utf8"));
-        if (Number.isInteger(pid) && pid > 0) {
-          try {
-            process.kill(pid, 0);
-          } catch (probe) {
-            abandoned = probe.code === "ESRCH";
-          }
-        }
-      } catch {
-      }
-      if (!abandoned) throw new RagError("busy", `Geist ${name} is locked; retry or inspect the lock's PID`);
-      try {
-        unlinkSync(path);
-        descriptor = openSync(path, "wx");
-      } catch {
-        throw new RagError("busy", `Geist ${name} lock changed; retry`);
-      }
-    } finally {
-      closeSync(guard);
-      unlinkSync(reclaim);
-    }
-  }
-  try {
-    writeFileSync(descriptor, JSON.stringify({ pid: process.pid }));
-    return await action();
-  } finally {
-    closeSync(descriptor);
-    unlinkSync(path);
-  }
-}
-
 // src/rag/embedding.ts
 var MODEL = "Xenova/all-MiniLM-L6-v2";
 var REVISION = "751bff37182d3f1213fa05d7196b954e230abad9";
 var MODEL_SIGNATURE = `${MODEL}@${REVISION}:q8:mean:normalized:tokenizers-0.2`;
-var MODEL_DIRECTORY = resolve2(dirname3(fileURLToPath(import.meta.url)), "../../models");
+var MODEL_DIRECTORY = resolve3(dirname4(fileURLToPath(import.meta.url)), "../../models");
 async function prepareModel() {
-  mkdirSync2(MODEL_DIRECTORY, { recursive: true });
+  mkdirSync4(MODEL_DIRECTORY, { recursive: true });
   for (const file of ["tokenizer.json", "tokenizer_config.json", "onnx/model_quantized.onnx"]) {
-    const target = resolve2(MODEL_DIRECTORY, file);
-    if (existsSync2(target)) continue;
+    const target = resolve3(MODEL_DIRECTORY, file);
+    if (existsSync4(target)) continue;
     const response = await fetch(`https://huggingface.co/${MODEL}/resolve/${REVISION}/${file}`, { signal: AbortSignal.timeout(12e4) });
     if (!response.ok) throw new RagError("model_unavailable", `Model download failed: HTTP ${response.status}`);
-    mkdirSync2(dirname3(target), { recursive: true });
+    mkdirSync4(dirname4(target), { recursive: true });
     const bytes = Buffer.from(await response.arrayBuffer());
     atomicWrite(target, bytes);
   }
@@ -11374,10 +11880,10 @@ async function createOnnxEmbedder() {
   try {
     const { InferenceSession, Tensor } = await import("onnxruntime-node");
     const tokenizer = new Tokenizer_default(
-      JSON.parse(readFileSync3(resolve2(MODEL_DIRECTORY, "tokenizer.json"), "utf8")),
-      JSON.parse(readFileSync3(resolve2(MODEL_DIRECTORY, "tokenizer_config.json"), "utf8"))
+      JSON.parse(readFileSync5(resolve3(MODEL_DIRECTORY, "tokenizer.json"), "utf8")),
+      JSON.parse(readFileSync5(resolve3(MODEL_DIRECTORY, "tokenizer_config.json"), "utf8"))
     );
-    const session = await InferenceSession.create(resolve2(MODEL_DIRECTORY, "onnx/model_quantized.onnx"), {
+    const session = await InferenceSession.create(resolve3(MODEL_DIRECTORY, "onnx/model_quantized.onnx"), {
       executionProviders: ["cpu"],
       intraOpNumThreads: 2,
       interOpNumThreads: 1
@@ -11417,444 +11923,6 @@ async function createOnnxEmbedder() {
   }
 }
 
-// src/rag/records.ts
-var import_yaml = __toESM(require_dist(), 1);
-import { existsSync as existsSync3, linkSync, mkdirSync as mkdirSync3, readFileSync as readFileSync4, readdirSync, statSync, unlinkSync as unlinkSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { createHash, randomUUID as randomUUID2 } from "node:crypto";
-import { dirname as dirname4, join as join3, resolve as resolve3 } from "node:path";
-var MAX_RECORD_BYTES = 256 * 1024;
-var hash = (value) => createHash("sha256").update(value).digest("hex");
-function validateId(id) {
-  if (!id || !id.endsWith(".md") || /[\\:\x00-\x1f]/.test(id) || id.split("/").some((part) => !part || part === "." || part === ".." || /[. ]$/.test(part))) {
-    throw new RagError("invalid_id", "Record IDs must be relative forward-slash .md paths");
-  }
-  return id;
-}
-function object(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-function parseRecord(id, markdown) {
-  validateId(id);
-  if (Buffer.byteLength(markdown) > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record exceeds 256 KiB");
-  let body = markdown.replace(/^\uFEFF/, "");
-  let frontmatter = {};
-  if (/^---\r?\n/.test(body)) {
-    const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(body);
-    if (!match) throw new RagError("invalid_record", "Unclosed YAML frontmatter");
-    try {
-      const document = (0, import_yaml.parseDocument)(match[1]);
-      if (document.errors.length) throw new Error("Malformed YAML");
-      const parsed = document.toJS({ maxAliasCount: 50 });
-      if (!object(parsed)) throw new Error("Frontmatter must be a mapping");
-      frontmatter = parsed;
-      JSON.stringify(frontmatter);
-    } catch {
-      throw new RagError("invalid_record", "Invalid YAML frontmatter mapping");
-    }
-    body = body.slice(match[0].length);
-  }
-  for (const field of ["kind", "state"]) {
-    if (frontmatter[field] !== void 0 && typeof frontmatter[field] !== "string") throw new RagError("invalid_record", `${field} must be a string`);
-  }
-  if (frontmatter.scope !== void 0 && (!Array.isArray(frontmatter.scope) || frontmatter.scope.some((item) => typeof item !== "string"))) {
-    throw new RagError("invalid_record", "scope must be a string list");
-  }
-  const links = frontmatter.links ?? [];
-  const sources = frontmatter.sources ?? [];
-  if (!Array.isArray(links) || links.some((link) => !object(link) || typeof link.record !== "string" || link.kind !== void 0 && typeof link.kind !== "string")) {
-    throw new RagError("invalid_record", "links must contain record IDs and optional string kinds");
-  }
-  for (const link of links) validateId(link.record);
-  if (!Array.isArray(sources) || sources.some((source) => !object(source) || typeof source.source !== "string" || source.date !== void 0 && (typeof source.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(source.date) || !Number.isFinite(Date.parse(source.date)) || new Date(source.date).toISOString().slice(0, 10) !== source.date))) {
-    throw new RagError("invalid_record", "sources must contain source strings and optional ISO dates");
-  }
-  return {
-    id,
-    title: /^#\s+(.+)$/m.exec(body)?.[1].trim() || id,
-    body,
-    markdown,
-    frontmatter,
-    links,
-    sources,
-    version: hash(markdown)
-  };
-}
-function matches(record, filters) {
-  if (filters.prefix && !record.id.startsWith(filters.prefix)) return false;
-  for (const field of ["kind", "state"]) {
-    if (filters[field]?.length && !filters[field].includes(record.frontmatter[field])) return false;
-  }
-  return !filters.scope?.length || filters.scope.some((scope) => record.frontmatter.scope?.includes(scope));
-}
-var RecordStore = class {
-  config;
-  constructor(config) {
-    this.config = config;
-  }
-  path(id) {
-    return safePath(this.config.workspace, resolve3(this.config.root, validateId(id)));
-  }
-  get(id) {
-    const path = this.path(id);
-    try {
-      if (!statSync(path).isFile() || statSync(path).size > MAX_RECORD_BYTES) throw new RagError("invalid_record", "Record is not a file or exceeds 256 KiB");
-      let markdown;
-      try {
-        markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync4(path));
-      } catch (error) {
-        if (error.code === "ERR_ENCODING_INVALID_ENCODED_DATA") throw new RagError("invalid_record", "Record must contain valid UTF-8");
-        throw error;
-      }
-      return parseRecord(id, markdown);
-    } catch (error) {
-      if (error.code === "ENOENT") throw new RagError("not_found", `Record not found: ${id}`);
-      throw error;
-    }
-  }
-  scan() {
-    safePath(this.config.workspace, this.config.root);
-    const records = [], warnings = [];
-    let count = 0;
-    const visit = (directory, prefix) => {
-      for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : 1)) {
-        const id = prefix + entry.name;
-        if (entry.isSymbolicLink()) {
-          warnings.push(`Skipped linked path: ${id}`);
-          continue;
-        }
-        if (entry.isDirectory()) {
-          safePath(this.config.workspace, join3(directory, entry.name));
-          visit(join3(directory, entry.name), `${id}/`);
-        } else if (entry.name.endsWith(".md")) {
-          if (++count > 2e3) throw new RagError("invalid_record", "Store exceeds the v1 limit of 2000 records");
-          try {
-            records.push(this.get(id));
-          } catch {
-            warnings.push(`Skipped invalid record: ${id}`);
-          }
-        }
-      }
-    };
-    if (existsSync3(this.config.root)) visit(this.config.root, "");
-    return { records, warnings };
-  }
-  async write(id, markdown, expectedVersion) {
-    const parsed = parseRecord(id, markdown);
-    return withLock(this.config, "records", () => {
-      const path = this.path(id);
-      if (expectedVersion !== void 0) {
-        if (this.get(id).version !== expectedVersion) throw new RagError("conflict", "Record changed; read it again before updating");
-        atomicWrite(path, markdown);
-      } else {
-        mkdirSync3(dirname4(path), { recursive: true });
-        safePath(this.config.workspace, path);
-        const temp = join3(dirname4(path), `.${randomUUID2()}.tmp`);
-        try {
-          writeFileSync2(temp, markdown, { flag: "wx" });
-          linkSync(temp, path);
-        } catch (error) {
-          if (error.code === "EEXIST") throw new RagError("already_exists", `Record already exists: ${id}`);
-          throw error;
-        } finally {
-          if (existsSync3(temp)) unlinkSync2(temp);
-        }
-      }
-      this.invalidate();
-      return parsed;
-    });
-  }
-  async delete(id, expectedVersion) {
-    await withLock(this.config, "records", () => {
-      if (this.get(id).version !== expectedVersion) throw new RagError("conflict", "Record changed; read it again before deleting");
-      unlinkSync2(this.path(id));
-      this.invalidate();
-    });
-  }
-  invalidate() {
-    atomicWrite(safePath(this.config.workspace, join3(this.config.cacheDirectory, "dirty.json")), JSON.stringify({ dirty: true }));
-  }
-  links(id) {
-    this.get(id);
-    const { records, warnings } = this.scan();
-    const ids = new Set(records.map((record) => record.id));
-    const edges = records.flatMap((record) => record.links.map((link) => ({
-      source: record.id,
-      target: link.record,
-      ...link.kind ? { kind: link.kind } : {},
-      resolved: ids.has(link.record)
-    })));
-    return { outgoing: edges.filter((edge) => edge.source === id), incoming: edges.filter((edge) => edge.target === id), warnings };
-  }
-};
-
-// src/rag/cache.ts
-import { existsSync as existsSync4, readFileSync as readFileSync5, unlinkSync as unlinkSync3 } from "node:fs";
-import { join as join4 } from "node:path";
-
-// src/rag/chunking.ts
-import { createHash as createHash2 } from "node:crypto";
-var CHUNKER_SIGNATURE = "geist-markdown-v1:body800:context200";
-var digest = (text) => createHash2("sha256").update(text).digest("hex");
-function attributes(value) {
-  const fields = [];
-  let start = 0, depth = 0, quote = "";
-  for (let i = 0; i < value.length; i++) {
-    const c = value[i];
-    if (quote) {
-      if (c === quote && value[i - 1] !== "\\") quote = "";
-    } else if (c === '"' || c === "'") quote = c;
-    else if (c === "[" || c === "{") depth++;
-    else if (c === "]" || c === "}") depth--;
-    else if (!depth && (c === ";" || c === ",")) {
-      fields.push(value.slice(start, i));
-      start = i + 1;
-    }
-  }
-  fields.push(value.slice(start));
-  const result = /* @__PURE__ */ Object.create(null);
-  for (const field of fields) {
-    const pair = /^\s*([\w.-]+)\s*[:=]\s*([\s\S]*?)\s*$/.exec(field);
-    if (pair) result[pair[1]] = pair[2];
-    else if (field.trim()) result.name = field.trim();
-  }
-  return result;
-}
-function chunkMarkdown(markdown, title = "") {
-  const lines = [...markdown.matchAll(/[^\n]*\n|[^\n]+$/g)].map((m) => ({
-    text: m[0].replace(/\r?\n$/, ""),
-    start: m.index,
-    end: m.index + m[0].length
-  }));
-  let first = 0;
-  if (lines[0]?.text.replace(/^\uFEFF/, "") === "---") {
-    const closing = lines.findIndex((line, i) => i > 0 && line.text === "---");
-    if (closing >= 0) first = closing + 1;
-  }
-  const chunks = [];
-  const headings = [];
-  const sections = [];
-  let blockMetadata = {};
-  let pendingStart = -1, pendingEnd = -1;
-  function emit(start, end) {
-    const text = markdown.slice(start, end);
-    if (!text.trim()) return;
-    const path = headings.map((h) => h.text);
-    const metadata = Object.assign({}, ...headings.map((h) => h.metadata), blockMetadata, ...sections.map((s) => s.metadata));
-    const context = [title, ...path.filter((h) => h !== title)].filter(Boolean).join(" > ").slice(0, 200);
-    const embeddingText = context ? `${context}
-${text}` : text;
-    const version = digest(JSON.stringify([CHUNKER_SIGNATURE, title, path, Object.entries(metadata).sort(([a], [b]) => a.localeCompare(b)), text]));
-    chunks.push({ id: version, version, text, embeddingText, headings: path, metadata, start, end });
-  }
-  function flush() {
-    if (pendingStart >= 0) emit(pendingStart, pendingEnd);
-    pendingStart = pendingEnd = -1;
-  }
-  function block(start, end) {
-    if (pendingStart >= 0 && end - pendingStart > 800) flush();
-    if (end - start <= 800) {
-      if (pendingStart < 0) pendingStart = start;
-      pendingEnd = end;
-      return;
-    }
-    flush();
-    while (end - start > 800) {
-      let stop = start + 800;
-      const window = markdown.slice(start, stop);
-      const boundary = Math.max(window.lastIndexOf("\n"), window.lastIndexOf(" "));
-      if (boundary >= 400) stop = start + boundary + 1;
-      if (/[\uD800-\uDBFF]/.test(markdown[stop - 1])) stop--;
-      emit(start, stop);
-      start = stop;
-    }
-    if (start < end) {
-      pendingStart = start;
-      pendingEnd = end;
-    }
-  }
-  for (let i = first; i < lines.length; ) {
-    const line = lines[i];
-    const section = /^\s*<!--\s*section:\s*(.*?)\s*-->\s*$/.exec(line.text);
-    if (section) {
-      flush();
-      blockMetadata = {};
-      sections.push({ metadata: attributes(section[1]), headings: [...headings] });
-      i++;
-      continue;
-    }
-    if (/^\s*<!--\s*\/section\s*-->\s*$/.test(line.text)) {
-      flush();
-      blockMetadata = {};
-      const closed = sections.pop();
-      if (closed) headings.splice(0, headings.length, ...closed.headings);
-      i++;
-      continue;
-    }
-    const annotation = /^\s*<!--\s*([\w.-]+\s*[:=][\s\S]*?)\s*-->\s*$/.exec(line.text);
-    if (annotation) {
-      flush();
-      blockMetadata = attributes(annotation[1]);
-      i++;
-      continue;
-    }
-    const atx = /^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$/.exec(line.text);
-    const setext = i + 1 < lines.length && line.text.trim() && !/^\s*(?:[-*+]\s|>|`|~|<)/.test(line.text) ? /^ {0,3}(=+|-+)[ \t]*$/.exec(lines[i + 1].text) : null;
-    if (atx || setext) {
-      flush();
-      const level = atx ? atx[1].length : setext[1][0] === "=" ? 1 : 2;
-      let text = atx ? (atx[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "") : line.text.trim();
-      const inline = /\s*<!--\s*(.*?)\s*-->\s*$/.exec(text);
-      const metadata = inline ? attributes(inline[1]) : {};
-      if (inline) text = text.slice(0, inline.index).trim();
-      while (headings.length && headings.at(-1).level >= level) headings.pop();
-      headings.push({ level, text, metadata });
-      block(line.start, lines[i + (setext ? 1 : 0)].end);
-      i += setext ? 2 : 1;
-      continue;
-    }
-    if (/^ {0,3}(?:(?:\*\s*){3,}|(?:_\s*){3,}|(?:-\s*){3,})$/.test(line.text)) {
-      flush();
-      blockMetadata = {};
-      i++;
-      continue;
-    }
-    if (!line.text.trim()) {
-      if (pendingStart >= 0) pendingEnd = line.end - pendingStart <= 800 ? line.end : pendingEnd;
-      i++;
-      continue;
-    }
-    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line.text);
-    let j = i + 1;
-    if (fence && !(fence[1][0] === "`" && fence[2].includes("`"))) {
-      const close = new RegExp(`^ {0,3}${fence[1][0]}{${fence[1].length},}[ \\t]*$`);
-      while (j < lines.length && !close.test(lines[j].text)) j++;
-      if (j < lines.length) j++;
-    } else if (/^\s*<!--/.test(line.text) && !line.text.includes("-->")) {
-      while (j < lines.length && !lines[j].text.includes("-->")) j++;
-      if (j < lines.length) j++;
-    } else {
-      while (j < lines.length && lines[j].text.trim() && !/^ {0,3}(?:#{1,6}(?:\s|$)|`{3,}|~{3,}|<!--|(?:(?:\*\s*){3,}|(?:_\s*){3,}|(?:-\s*){3,})$)/.test(lines[j].text) && !(j + 1 < lines.length && /^ {0,3}(?:=+|-+)[ \t]*$/.test(lines[j + 1].text))) j++;
-    }
-    block(line.start, lines[j - 1].end);
-    if (Object.keys(blockMetadata).length) {
-      flush();
-      blockMetadata = {};
-    }
-    i = j;
-  }
-  flush();
-  return chunks;
-}
-
-// src/rag/cache.ts
-var FORMAT = `geist-chunk-cache-v2:${CHUNKER_SIGNATURE}`;
-function chunksFor(record) {
-  return chunkMarkdown(record.body, record.title);
-}
-function validVectors(value, count) {
-  return Array.isArray(value) && value.length === count && value.every((vector) => Array.isArray(vector) && vector.length > 0 && vector.length === value[0].length && vector.every((number) => typeof number === "number" && Number.isFinite(number)));
-}
-var DocumentCache = class {
-  store;
-  embedder;
-  constructor(store, embedder) {
-    this.store = store;
-    this.embedder = embedder;
-  }
-  async refresh(rebuild = false) {
-    const config = this.store.config;
-    return withLock(config, "index", async () => {
-      const path = safePath(config.workspace, join4(config.cacheDirectory, "documents.json"));
-      let previous = [];
-      let compatible = false;
-      if (!rebuild && existsSync4(path)) {
-        try {
-          const saved = JSON.parse(readFileSync5(path, "utf8"));
-          if (saved.format === FORMAT && saved.model === this.embedder.signature && saved.root === config.root && Array.isArray(saved.entries)) {
-            previous = saved.entries;
-            compatible = true;
-          }
-        } catch {
-        }
-      }
-      const old = new Map(previous.filter((entry) => entry?.record?.id).map((entry) => [entry.record.id, entry]));
-      const { records, warnings } = this.store.scan();
-      const entries = [];
-      let updated = 0, reused = 0;
-      for (const record of records) {
-        const chunks = chunksFor(record);
-        const cached = old.get(record.id);
-        if (cached?.record.version === record.version && JSON.stringify(cached.chunks) === JSON.stringify(chunks) && validVectors(cached.vectors, chunks.length)) {
-          entries.push({ record, chunks, vectors: cached.vectors });
-          reused++;
-        } else {
-          const reusable = /* @__PURE__ */ new Map();
-          if (!rebuild && cached && Array.isArray(cached.chunks) && cached.chunks.every((chunk) => chunk && typeof chunk.version === "string") && validVectors(cached.vectors, cached.chunks.length)) {
-            cached.chunks.forEach((chunk, index) => reusable.set(chunk.version, cached.vectors[index]));
-          }
-          const missing = chunks.filter((chunk) => !reusable.has(chunk.version));
-          const fresh = missing.length ? await this.embedder.embed(missing.map((chunk) => chunk.embeddingText)) : [];
-          if (missing.length && !validVectors(fresh, missing.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
-          missing.forEach((chunk, index) => reusable.set(chunk.version, fresh[index]));
-          const vectors = chunks.map((chunk) => reusable.get(chunk.version));
-          if (!validVectors(vectors, chunks.length)) throw new RagError("model_unavailable", "Embedding model returned invalid vectors");
-          entries.push({ record, chunks, vectors });
-          updated++;
-        }
-      }
-      const ids = new Set(records.map((record) => record.id));
-      const removed = [...old.keys()].filter((id) => !ids.has(id)).length;
-      const after = this.store.scan();
-      if (JSON.stringify(after.records.map((r) => [r.id, r.version])) !== JSON.stringify(records.map((r) => [r.id, r.version]))) {
-        throw new RagError("conflict", "Records changed while indexing; retry");
-      }
-      const snapshot = { format: FORMAT, model: this.embedder.signature, root: config.root, entries };
-      if (!compatible || rebuild || updated || removed || previous.length !== entries.length) atomicWrite(path, JSON.stringify(snapshot));
-      const dirty = safePath(config.workspace, join4(config.cacheDirectory, "dirty.json"));
-      if (existsSync4(dirty)) unlinkSync3(dirty);
-      return { entries, refresh: { total: entries.length, updated, reused, removed, warnings } };
-    });
-  }
-  async search(query, options = {}) {
-    if (!query.trim() || query.length > 4e3) throw new RagError("invalid_record", "Query must contain 1\u20134000 characters");
-    const limit = options.limit ?? this.store.config.topK;
-    if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw new RagError("invalid_record", "Search limit must be between 1 and 20");
-    const { entries, refresh } = await this.refresh();
-    const candidates = entries.filter(({ record }) => matches(record, options) && (options.include_inactive || options.state?.length || record.frontmatter.state === void 0 || record.frontmatter.state === "active"));
-    if (!candidates.length) return { matches: [], refresh };
-    const [vector] = await this.embedder.embed([query]);
-    if (!validVectors([vector], 1)) throw new RagError("model_unavailable", "Invalid query vector");
-    const ranked = candidates.flatMap((entry) => {
-      const seen = /* @__PURE__ */ new Set();
-      return entry.chunks.flatMap((chunk, index) => {
-        if (seen.has(chunk.id)) return [];
-        seen.add(chunk.id);
-        const candidate = entry.vectors[index];
-        if (candidate.length !== vector.length) throw new RagError("model_unavailable", "Embedding dimensions changed; rebuild the cache");
-        const dot = candidate.reduce((sum, value, offset) => sum + value * vector[offset], 0);
-        const norm = Math.sqrt(candidate.reduce((sum, value) => sum + value * value, 0) * vector.reduce((sum, value) => sum + value * value, 0));
-        const score = norm ? dot / norm : 0;
-        return [{
-          id: entry.record.id,
-          version: entry.record.version,
-          title: entry.record.title,
-          path: this.store.path(entry.record.id),
-          score: Math.round(score * 1e6) / 1e6,
-          chunk_id: chunk.id,
-          chunk_version: chunk.version,
-          content: chunk.text,
-          headings: chunk.headings,
-          metadata: chunk.metadata,
-          start: chunk.start,
-          end: chunk.end,
-          excerpt: chunk.text.replace(/\s+/g, " ").slice(0, 240)
-        }];
-      });
-    });
-    return { matches: ranked.filter((match) => match.score >= this.store.config.minScore).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : a.start - b.start)).slice(0, limit), refresh };
-  }
-};
-
 // src/rag/cli.ts
 var [command, workspace = process.env.GEIST_WORKSPACE_DIR || process.cwd(), ...words] = process.argv.slice(2);
 try {
@@ -11862,8 +11930,11 @@ try {
   if (command === "prepare") await prepareModel();
   const embedder = await createOnnxEmbedder();
   try {
-    const config = readRagConfig(workspace);
-    const cache = new DocumentCache(new RecordStore(config), embedder);
+    initializeUserData();
+    const storeFlag = words.indexOf("--store");
+    const selection = storeFlag >= 0 ? words.splice(storeFlag, 2)[1] : "all";
+    if (!["workspace", "global", "all"].includes(selection)) throw new Error("--store must be workspace, global, or all");
+    const configs = storeConfigs(workspace).filter((config) => selection === "all" || config.store === selection);
     let output;
     if (command === "prepare") output = { prepared: true, model: MODEL_SIGNATURE };
     else if (command === "search" || command === "hook-search") {
@@ -11876,8 +11947,8 @@ try {
         }
         query = JSON.parse(input).query;
       }
-      output = await cache.search(query);
-    } else output = (await cache.refresh(command === "rebuild")).refresh;
+      output = await searchStores(command === "hook-search" ? configs.filter((config) => config.enabled) : configs, embedder, query, { limit: command === "hook-search" ? automaticConfig(workspace).topK : configs[0]?.topK });
+    } else output = await refreshStores(configs, embedder, command === "rebuild");
     process.stdout.write(`${JSON.stringify(output)}
 `);
   } finally {

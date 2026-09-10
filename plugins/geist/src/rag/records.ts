@@ -144,7 +144,7 @@ export class RecordStore {
   }
   invalidate(): void {
     // Source hashes are authoritative; the marker also makes pending edits observable.
-    atomicWrite(safePath(this.config.workspace, join(this.config.cacheDirectory, "dirty.json")), JSON.stringify({ dirty: true }));
+    atomicWrite(safePath(this.config.cacheRoot, join(this.config.cacheDirectory, "dirty.json")), JSON.stringify({ dirty: true }));
   }
   links(id: string) {
     this.get(id);

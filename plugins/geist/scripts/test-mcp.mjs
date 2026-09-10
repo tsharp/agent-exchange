@@ -1,3 +1,4 @@
+import "./test-user-env.mjs";
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -72,7 +73,7 @@ test("copied MCP bundle starts and edits records without node_modules or models"
   mkdirSync(plugin);
   cpSync(resolve("runtime"), join(plugin, "runtime"), { recursive: true });
   writeFileSync(join(plugin, "package.json"), JSON.stringify({ name: "geist", version: "9.8.7" }));
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
   const transport = new StdioClientTransport({ command: process.execPath, args: [join(plugin, "runtime", "mcp", "run.mjs")], cwd: path, env, stderr: "pipe" });
   client = new Client({ name: "installed-test", version: "1.0.0" });
   await client.connect(transport);

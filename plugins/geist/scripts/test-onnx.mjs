@@ -1,3 +1,5 @@
+import { readRagConfig } from "../src/rag/config.ts";
+import "./test-user-env.mjs";
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,7 +26,7 @@ test("real ONNX ranks records and both prompt hooks inject bounded hints offline
     "cooking.md": "# Baking bread\nMix flour, yeast, salt and water. Knead the dough and let it rise before baking in a hot oven.",
   };
   for (const [id, body] of Object.entries(records)) writeFileSync(join(workspace, "docs", id), body);
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
   function cli(command, ...args) {
     const started = performance.now();
     const result = spawnSync(process.execPath, [resolve("runtime/rag/run.mjs"), command, workspace, ...args], { env, encoding: "utf8", timeout: 30000 });
@@ -76,8 +78,30 @@ test("real ONNX ranks records and both prompt hooks inject bounded hints offline
   writeFileSync(join(workspace, "docs", "database.md"), `${records["database.md"]}\nUse serializable isolation for account balances.`);
   assert.equal(cli("search", query).refresh.updated, 1);
   assert.equal(cli("rebuild").updated, 4);
-  assert.equal(readFileSync(join(workspace, ".geist", "cache", "rag", "documents.json"), "utf8").includes(query), false);
+  assert.equal(readFileSync(join(readRagConfig(workspace).cacheDirectory, "documents.json"), "utf8").includes(query), false);
   console.log(`ONNX integration timings: ${JSON.stringify(timings)}`);
+  // A global-only store can deliver different sections of one document in one session.
+  env.GEIST_USER_DIR = join(workspace, "user-data");
+  mkdirSync(join(env.GEIST_USER_DIR, "docs"), { recursive: true });
+  writeFileSync(join(env.GEIST_USER_DIR, "config.toml"), '[rag]\nenabled=true\nmin_score=0\ntop_k=1\n');
+  writeFileSync(join(workspace, ".geist", "config.toml"), '[rag]\nenabled=false\n');
+  writeFileSync(join(env.GEIST_USER_DIR, "docs", "handbook.md"), '## Transactions\nPostgreSQL handles ACID transactions, database isolation and consistency.\n## Bread\nMix flour and yeast, knead dough, let it rise, then bake bread.');
+  assert.equal(cli("index", "--store", "global").updated, 1);
+  const globalHints = (prompt) => {
+    const result = spawnSync(process.execPath, [resolve("runtime/hooks/run.mjs"), "codex", "UserPromptSubmit"], {
+      env, input: JSON.stringify({ cwd: workspace, session_id: "global-sections", prompt }), encoding: "utf8", timeout: 5000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const text = JSON.parse(result.stdout).hookSpecificOutput?.additionalContext;
+    return text ? JSON.parse(text.slice(text.indexOf("\n") + 1)) : [];
+  };
+  const database = globalHints("How does the database guarantee atomic transactions?");
+  const bread = globalHints("How do I knead and bake bread with yeast?");
+  assert.equal(database[0].store, "global");
+  assert.equal(database[0].id, bread[0].id);
+  assert.notEqual(database[0].chunk_id, bread[0].chunk_id);
+  assert.match(database[0].content, /PostgreSQL/); assert.match(bread[0].content, /flour/);
+  assert.deepEqual(globalHints("How do I knead and bake bread with yeast?"), []);
 });
 
 test("a cold MCP installation prepares ONNX and recovers search without restarting", async (t) => {
@@ -96,7 +120,7 @@ test("a cold MCP installation prepares ONNX and recovers search without restarti
   mkdirSync(join(workspace, "docs"));
   writeFileSync(join(workspace, ".geist", "config.toml"), '[rag]\nenabled=true\nmin_score=0\n');
   writeFileSync(join(workspace, "docs", "transactions.md"), "# Storage\nPostgreSQL handles atomic transactions.");
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GEIST_")));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key === "GEIST_USER_DIR" || !key.startsWith("GEIST_")));
   const transport = new StdioClientTransport({ command: process.execPath,
     args: [join(plugin, "runtime/mcp/run.mjs")], cwd: workspace, env, stderr: "pipe" });
   const client = new Client({ name: "cold-setup-test", version: "1.0.0" });

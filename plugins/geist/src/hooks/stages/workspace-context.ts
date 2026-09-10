@@ -4,13 +4,12 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse } from "smol-toml";
 
 import { appendInstructions, type HookStage } from "../pipeline.ts";
+import { initializeUserData } from "../../rag/config.ts";
 
 const CONTEXT_EVENTS = new Set(["SessionStart", "SubagentStart"]);
 
-function configuredInstructionFiles(workspace: string): string[] {
-  const configuredPath = process.env.GEIST_CONFIG_FILE?.trim();
-  const configPath = configuredPath || join(workspace, ".geist", "config.toml");
-  if (!configuredPath && !existsSync(configPath)) {
+function configuredInstructionFiles(configPath: string, required = false): string[] {
+  if (!required && !existsSync(configPath)) {
     return [];
   }
 
@@ -47,7 +46,12 @@ export const injectWorkspaceContext: HookStage = {
   run(request, response) {
     if (!CONTEXT_EVENTS.has(request.event)) return;
 
-    for (const file of configuredInstructionFiles(request.workspace)) {
+    const globalConfig = join(initializeUserData(), "config.toml");
+    const selected = process.env.GEIST_CONFIG_FILE?.trim();
+    const localConfig = selected || join(request.workspace, ".geist", "config.toml");
+    const files = configuredInstructionFiles(globalConfig);
+    if (resolve(localConfig) !== resolve(globalConfig)) files.push(...configuredInstructionFiles(localConfig, !!selected));
+    for (const file of files) {
       appendInstructions(response, readFileSync(file, "utf8"));
     }
   },
