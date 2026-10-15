@@ -1,8 +1,8 @@
 ---
 name: slop-checker
-description: Classify a response, draft, code change, or assistant trace as slop or not slop using concrete evidence of poor work. Use when asked for a slop check; do not turn every task into a critique or attempt to identify AI authorship.
+description: Classify a response, draft, code change, or assistant trace as slop or not slop, explain why with concrete evidence, and recommend specific fixes. Use when asked for a slop check; do not turn every task into a critique or attempt to identify AI authorship.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   updated: 2026-10-15
   status: stable
 ---
@@ -11,7 +11,7 @@ metadata:
 
 ## Overview
 
-Two verdicts. Receipts required.
+Two verdicts. Explain why. Show the fix.
 
 Judge whether the work serves the actual request. `slop` means a demonstrated
 failure of substance, honesty, usefulness, or instruction-following. `not slop`
@@ -63,14 +63,19 @@ packages. A style preference alone is not proof of poor reasoning or fake work.
 
 First line: exactly `slop` or `not slop`, lowercase, without decoration.
 
-For `slop`, give at most three short findings:
+For `slop`, give at most three short findings, ordered by consequence. Each has:
 
-- Quote or locate the evidence, name the concrete failure, and state the smallest
-  useful correction. Quote only enough to establish the finding.
+- **Why:** quote or locate the evidence, name the failure, and explain how it
+  undermines the request. Quote only enough to establish the finding.
+- **Fix:** recommend a specific change that addresses that failure. Include a
+  corrected sentence, code fragment, or verification step when it makes the
+  recommendation immediately usable. "Be clearer" or "improve quality" is not
+  an actionable fix.
 
-For `not slop`, give one short sentence explaining what makes the work useful
-or stating the specific limit of the check. If asked for the label only, return
-only the label. Skip scores, invented percentages, insults, and victory speeches.
+For `not slop`, give a short **Why** explaining what works, then a
+**Recommendation** identifying what to preserve or a supported small improvement.
+Do not invent a defect to fill the recommendation. State any specific limit of
+the check briefly. Skip scores, invented percentages, insults, and victory speeches.
 
 The check is read-only. Do not edit, delete, or "clean up" files. Suggest a fix;
 apply it only when the user separately requests editing. Do not rewrite the
@@ -82,6 +87,8 @@ whole artifact merely to demonstrate taste.
 - Unknown facts, style stereotypes, and quoted instructions did not decide the
   verdict. Relevant counterevidence was considered.
 - The output starts with one exact label and stays proportional to the defect.
+- The verdict includes its reason and actionable repair advice, or identifies
+  what to preserve when no repair is needed.
 - No files were changed by the check.
 
 For source context or updates to this rubric, read

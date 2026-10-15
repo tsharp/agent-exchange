@@ -41,8 +41,9 @@ installed skills or activate routes.
 Use `slop-checker` for a short, read-only quality verdict on supplied work. It
 checks substance, honesty, task completion, and instruction-following; it does
 not infer AI authorship from punctuation or writing style. Findings identify
-concrete evidence and the smallest useful correction. The check never edits or
-deletes files.
+concrete evidence, explain why the work fails, and recommend specific fixes.
+A `not slop` verdict explains what works and what to preserve or improve. The
+check never edits or deletes files.
 
 The engineering workflows follow the communication, general engineering, and
 language styles selected by active instructions. They keep personal rules in

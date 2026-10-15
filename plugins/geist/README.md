@@ -112,8 +112,9 @@ retrospective does not automatically add rules or edit configuration. The
 
 For a quick quality check, use `slop-checker` on a response, draft, code change,
 or assistant trace. It returns exactly `slop` or `not slop` on the first line,
-then a short explanation with concrete evidence. Ask for "label only" to get
-just the verdict. It checks the work, not presumed AI authorship, and never
+then explains why with concrete evidence and recommends specific fixes. A
+`not slop` result explains what to preserve without inventing defects. It checks
+the work, not presumed AI authorship, and never
 edits or deletes files.
 
 Select existing packages in global or workspace configuration:
@@ -358,13 +359,16 @@ package retains the upstream MIT copyright and license in its `LICENSE` file.
 Keep this section aligned with skill versions, pinned source revisions, and
 subsequent changes to the adaptations.
 
-[slop-checker 1.0.0](skills/slop-checker/SKILL.md) is an original, research-informed
+[slop-checker 1.1.0](skills/slop-checker/SKILL.md) is an original, research-informed
 workflow, not an adaptation of an upstream skill. Its
 [source notes](skills/slop-checker/references/evidence.md), checked 2026-10-15,
-record six primary sources and their limits. This version introduces a binary
+record six primary sources and their limits. Version 1.0.0 introduced a binary
 verdict, evidence-backed findings, explicit false-positive checks, and read-only
 operation. Its rubric is a practical quality review, not a validated scientific
 detector or an AI-authorship test.
+Version 1.1.0 requires an explicit reason and specific repair advice for each
+finding; a `not slop` verdict identifies what to preserve or a supported small
+improvement. The default report always includes more than the verdict.
 
 ## Develop Geist
 
