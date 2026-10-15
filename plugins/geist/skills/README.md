@@ -9,6 +9,8 @@ Geist ships these reusable workflows:
 | [refine-with-docs](refine-with-docs/SKILL.md) | Refining ideas, plans, requirements, processes, and drafts through an interview and evolving docs |
 | [swe-diagnose](swe-diagnose/SKILL.md) | Reproducing a software failure, investigating its cause, and verifying a correction |
 | [swe-prototype](swe-prototype/SKILL.md) | Resolving a concrete engineering or UI question with a small experiment |
+| [swe-review](swe-review/SKILL.md) | Reviewing requested behavior and confirmed standards in one actionable report |
+| [swe-retro](swe-retro/SKILL.md) | Proposing evidence-backed improvements after significant work or recurring friction |
 
 These contain no personal style prescriptions, interview transcripts, or sample
 projects.
@@ -40,6 +42,11 @@ language styles selected by active instructions. They keep personal rules in
 their canonical packages and scale investigation and artifacts to the task.
 Use diagnosis for a reported failure and a prototype for an uncertainty best
 answered experimentally. Neither is a prerequisite for routine implementation.
+Use review to assess a change against requirements and confirmed standards; use
+a retrospective when requested to improve the workflow from observed friction.
+These packages do not require an issue tracker, extra approval rounds for routine
+choices, or mandatory agent orchestration. They retain distinct names from the
+upstream skills so the chosen workflow is explicit.
 Their upstream MIT notices are retained inside each independently installable
 adapted package.
 

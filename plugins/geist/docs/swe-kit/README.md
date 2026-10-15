@@ -55,6 +55,13 @@ authored styles as the starting recommendation; workflows do not add themselves
 to startup routing or require tracker setup. Each adapted package retains its
 upstream license so it can be installed independently.
 
+`swe-review` applies confirmed standards alongside the requested behavior and
+reports actionable findings. `swe-retro` proposes workflow changes from evidence
+and checks existing tooling before suggesting new guidance. Both preserve
+personal ownership: inferred preferences remain proposals, and canonical rules
+stay in the personal store. Standards apply during implementation and review.
+These workflows remain optional tools rather than a mandatory task pipeline.
+
 ## Verification
 
 Run `npm test` from the marketplace root after changing configuration, skills,

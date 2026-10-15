@@ -138,7 +138,7 @@ test("startup routing rejects missing, duplicate, ambiguous, and malformed selec
 
 test("style packages validate and broken references or nested discovery fail", async () => {
   const valid = await validateSkills(root);
-  assert.deepEqual(valid, { failures: [], skillCount: 5 });
+  assert.deepEqual(valid, { failures: [], skillCount: 7 });
   writeFileSync(join(installed, "skills/example-engineering/SKILL.md"),
     readFileSync(join(installed, "skills/example-engineering/SKILL.md"), "utf8") + '\n[Missing](references/absent.md)\n[Outside](../outside.md)\n');
   mkdirSync(join(installed, "skills/category"));

@@ -103,6 +103,13 @@ experiment. Both follow the configured personal styles, choose appropriate
 artifacts and checks, and avoid a mandatory interview or tracker setup. They
 are workflows to use when needed, not extra steps for every change.
 
+`swe-review` checks requested behavior and applicable standards, then reports
+concrete findings ordered by consequence. `swe-retro` proposes small improvements
+from observed workflow friction when a retrospective is requested. Both use
+configured personal styles. Review does not require parallel agents, and a
+retrospective does not automatically add rules or edit configuration. The
+[skills index](skills/README.md) lists all workflows and their intended scope.
+
 Select existing packages in global or workspace configuration:
 
 ```toml
