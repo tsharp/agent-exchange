@@ -18,12 +18,14 @@ const installed = join(temporary, "installed plugin with spaces");
 mkdirSync(installed);
 for (const path of ["skills", "runtime", "plugin.json"]) cpSync(join(root, path), join(installed, path), { recursive: true });
 const styles = ["example-communication","example-engineering","example-rust"];
-for (const name of styles) {
-  const directory = join(installed, "skills", name);
+function writeSkillFixture(store, name) {
+  const directory = join(store, "skills", name);
   mkdirSync(join(directory, "agents"), { recursive: true });
   writeFileSync(join(directory, "SKILL.md"), `---\nname: ${name}\ndescription: Apply the synthetic ${name} fixture.\nmetadata:\n  version: 1.0.0\n  updated: 2026-10-14\n  status: stable\n---\n\n## Overview\nFixture body.\n\n## Completion checks\nCheck fixture behavior.\n`);
   writeFileSync(join(directory, "agents/openai.yaml"), 'interface:\n  display_name: "Example style"\n  short_description: "Synthetic style fixture for routing tests"\n');
+  return directory;
 }
+for (const name of styles) writeSkillFixture(installed, name);
 const setup = join(installed, "skills/swe-init/scripts/setup.mjs");
 const runner = join(installed, "runtime/hooks/run.mjs");
 const environment = { ...process.env, GEIST_CONFIG_FILE: "", GEIST_HOOK_CONTROLLER: "", GEIST_WORKSPACE_DIR: "" };
@@ -136,13 +138,37 @@ test("startup routing rejects missing, duplicate, ambiguous, and malformed selec
   assert.match(run().stderr, /matching name and nonempty description/);
 });
 
-test("style packages validate and broken references or nested discovery fail", async () => {
-  const valid = await validateSkills(root);
-  assert.deepEqual(valid, { failures: [], skillCount: 7 });
-  writeFileSync(join(installed, "skills/example-engineering/SKILL.md"),
-    readFileSync(join(installed, "skills/example-engineering/SKILL.md"), "utf8") + '\n[Missing](references/absent.md)\n[Outside](../outside.md)\n');
-  mkdirSync(join(installed, "skills/category"));
-  const invalid = await validateSkills(installed);
+test("skill validation accepts additional independent packages", async () => {
+  const store = join(temporary, "valid-packages");
+  const skill = writeSkillFixture(store, "first-style");
+  mkdirSync(join(skill, "references"));
+  writeFileSync(join(skill, "references/guide.md"), "Package-local guidance.\n");
+  writeFileSync(join(skill, "SKILL.md"),
+    readFileSync(join(skill, "SKILL.md"), "utf8") + '\n[Guide](references/guide.md)\n');
+  assert.deepEqual(await validateSkills(store), { failures: [], skillCount: 1 });
+
+  writeSkillFixture(store, "another-style");
+  assert.deepEqual(await validateSkills(store), { failures: [], skillCount: 2 });
+});
+
+test("skill validation rejects malformed package and display metadata", async () => {
+  const store = join(temporary, "malformed-packages");
+  const skill = writeSkillFixture(store, "invalid-style");
+  writeFileSync(join(skill, "SKILL.md"),
+    readFileSync(join(skill, "SKILL.md"), "utf8").replace("version: 1.0.0", "version: invalid"));
+  writeFileSync(join(skill, "agents/openai.yaml"), 'interface:\n  display_name: "Missing description"\n');
+  const invalid = await validateSkills(store);
+  assert.match(invalid.failures.join("\n"), /metadata.version must be a stable semantic version/);
+  assert.match(invalid.failures.join("\n"), /missing interface.short_description/);
+});
+
+test("skill validation rejects broken references and nested discovery", async () => {
+  const store = join(temporary, "invalid-package-layout");
+  const skill = writeSkillFixture(store, "example-style");
+  writeFileSync(join(skill, "SKILL.md"),
+    readFileSync(join(skill, "SKILL.md"), "utf8") + '\n[Missing](references/absent.md)\n[Outside](../outside.md)\n');
+  writeSkillFixture(join(store, "skills/category"), "nested-style");
+  const invalid = await validateSkills(store);
   assert.match(invalid.failures.join("\n"), /missing link/);
   assert.match(invalid.failures.join("\n"), /link escapes independent skill/);
   assert.match(invalid.failures.join("\n"), /immediate skill/);
