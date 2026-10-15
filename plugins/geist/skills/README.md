@@ -11,6 +11,7 @@ Geist ships these reusable workflows:
 | [swe-prototype](swe-prototype/SKILL.md) | Resolving a concrete engineering or UI question with a small experiment |
 | [swe-review](swe-review/SKILL.md) | Reviewing requested behavior and confirmed standards in one actionable report |
 | [swe-retro](swe-retro/SKILL.md) | Proposing evidence-backed improvements after significant work or recurring friction |
+| [slop-checker](slop-checker/SKILL.md) | Classifying a response, draft, code change, or assistant trace as slop or not slop, with evidence |
 
 These contain no personal style prescriptions, interview transcripts, or sample
 projects.
@@ -36,6 +37,12 @@ outcomes. It uses focused question rounds, concrete examples, and updates to a
 working document. It supports subjects beyond engineering and can establish
 accepted choices before `swe-author` packages them. It does not require other
 installed skills or activate routes.
+
+Use `slop-checker` for a short, read-only quality verdict on supplied work. It
+checks substance, honesty, task completion, and instruction-following; it does
+not infer AI authorship from punctuation or writing style. Findings identify
+concrete evidence and the smallest useful correction. The check never edits or
+deletes files.
 
 The engineering workflows follow the communication, general engineering, and
 language styles selected by active instructions. They keep personal rules in

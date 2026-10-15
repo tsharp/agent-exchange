@@ -110,6 +110,12 @@ configured personal styles. Review does not require parallel agents, and a
 retrospective does not automatically add rules or edit configuration. The
 [skills index](skills/README.md) lists all workflows and their intended scope.
 
+For a quick quality check, use `slop-checker` on a response, draft, code change,
+or assistant trace. It returns exactly `slop` or `not slop` on the first line,
+then a short explanation with concrete evidence. Ask for "label only" to get
+just the verdict. It checks the work, not presumed AI authorship, and never
+edits or deletes files.
+
 Select existing packages in global or workspace configuration:
 
 ```toml
@@ -351,6 +357,14 @@ from the skill bodies without changing their workflows. Each independent
 package retains the upstream MIT copyright and license in its `LICENSE` file.
 Keep this section aligned with skill versions, pinned source revisions, and
 subsequent changes to the adaptations.
+
+[slop-checker 1.0.0](skills/slop-checker/SKILL.md) is an original, research-informed
+workflow, not an adaptation of an upstream skill. Its
+[source notes](skills/slop-checker/references/evidence.md), checked 2026-10-15,
+record six primary sources and their limits. This version introduces a binary
+verdict, evidence-backed findings, explicit false-positive checks, and read-only
+operation. Its rubric is a practical quality review, not a validated scientific
+detector or an AI-authorship test.
 
 ## Develop Geist
 

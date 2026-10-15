@@ -1,0 +1,3 @@
+interface:
+  display_name: "Slop Checker"
+  short_description: "Slop or not slop. Evidence, then the smallest fix."
