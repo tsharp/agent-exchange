@@ -1,24 +1,26 @@
 # Geist skills
 
-Both Geist plugin manifests load this directory. Add each skill once so Codex and Copilot use the same source. Other plugins keep their skills in their own plugin directories.
+Geist ships `swe-init`, a reusable workflow for routing selected style skills
+through standard startup instruction injection. It contains no personal style
+prescriptions, interview transcripts, or sample projects.
 
-Use this layout within `plugins/geist/`:
+Keep personal packages in `~/.geist/skills/<name>/SKILL.md` (or
+`GEIST_USER_DIR/skills`). Workspace packages can use `.agents/skills`,
+`.github/skills`, or `skills`. Each package remains independently installable;
+keep its references and policies inside its directory.
 
-```text
-skills/
-  engineering/
-    skill-name/
-      SKILL.md
-      agents/openai.yaml
-      references/         # Optional supporting documentation
-      scripts/            # Optional automation
-      assets/             # Optional templates
-  productivity/
-    skill-name/
-      SKILL.md
-      agents/openai.yaml
-```
+Use [swe-init](swe-init/SKILL.md) to activate existing packages. Creating or
+refining personal rules is separate authoring work: review the user's evidence,
+confirm candidate interpretations, and update the owning private package.
 
-Each `SKILL.md` needs YAML frontmatter with a `name` matching its directory and a `description` explaining when to use it, followed by the skill's instructions. Use `agents/openai.yaml` for Codex display and invocation metadata.
+Geist injects each configured skill's description and canonical file path at
+session and subagent startup. The agent reads applicable skill bodies and their
+task-relevant references. Interviews, samples, and proposals are excluded unless
+explicitly requested as authoring evidence. This is model-followed routing;
+installing a package alone does not activate startup routing or guarantee that
+it appears in the host's skill picker.
 
-No skills are included in the initial scaffold. Create category directories when adding their first skill.
+Public plugin skills stay immediately beneath `skills/`, with matching directory
+and frontmatter names and display metadata. The public maintenance contract is
+in [style storage and maintenance](../docs/swe-kit/README.md). See the
+[configuration guide](../README.md#style-skills) and run `npm test` after changes.

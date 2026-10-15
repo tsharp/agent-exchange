@@ -24,6 +24,14 @@ The runner normalizes the host payload, loads configured workspace instructions 
 
 Workspace instructions are injected only at `SessionStart` and `SubagentStart`. See [workspace configuration](../README.md#configure-workspace-instructions) for file selection and override behavior.
 
+Each `[instructions]` table accepts ordered `files`, ordered `skills`, or both.
+Global files and skill routes precede local files and skill routes. Skill routes
+contain the selected skill's frontmatter description and resolved absolute path,
+with an instruction to read it when its scope applies. The hook does not preload
+full skill bodies, match file globs, or run a task classifier. Descriptions own
+the activation conditions, keeping each instruction canonical. The external
+controller's `skills` response continues to load full bodies as before.
+
 The built-in RAG stage searches through a subprocess with a configured deadline, returns bounded Markdown chunks, and fails open. Its model is prepared outside hook execution. See [document retrieval](../README.md#enable-document-retrieval). The optional `ragContextStage` helper remains available for custom in-process retrievers; the default flow requires no custom controller or pipeline definition.
 
 Automatic delivery uses `session_id` (Codex) or `sessionId` (Copilot), accepts either spelling, and isolates state by host, workspace, and both record roots. Only emitted record/chunk identities and chunk versions are saved under `~/.geist/cache/<repo-id>/rag/sessions/`, using hashed filenames and a process lock. Retrieval ranks before deduplication; unseen lower-ranked chunks do not fill gaps. Character-budget exclusions are not marked delivered. Session start resets state except for `source: resume`; session end removes it. Codex `source: compact`/`clear` and Copilot `preCompact` make hints eligible on the next prompt. Subagent and turn-stop events leave the parent state intact.
@@ -54,7 +62,7 @@ The controller runs directly without a shell. It receives one JSON object on std
 }
 ```
 
-Named skills resolve from the workspace's `.agents/skills`, `.github/skills`, and `skills` directories, plus this plugin's `skills` directory. Unknown or ambiguous names fail the response. Skill bodies become instructions; reference context is explicitly marked as untrusted data.
+Named skills resolve from the workspace's `.agents/skills`, `.github/skills`, and `skills` directories, the personal `~/.geist/skills` directory (or `GEIST_USER_DIR/skills`), plus this plugin's `skills` directory. Unknown or ambiguous names fail the response. Skill bodies become instructions; reference context is explicitly marked as untrusted data.
 
 At `Stop` or `SubagentStop`, a controller can return `decision: "block"` with a nonempty `reason` to request another turn. Controllers must enforce a finite continuation budget and respect the host's active-stop marker. With `required: false`, controller failure logs a diagnostic and allows the hook to continue; `required: true` fails the hook. No configured controller is a successful no-op. The timeout is capped at 4.5 seconds and output at 64 KiB.
 

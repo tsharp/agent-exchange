@@ -5,10 +5,11 @@ import { parse } from "smol-toml";
 
 import { appendInstructions, type HookStage } from "../pipeline.ts";
 import { initializeUserData } from "../../rag/config.ts";
+import { resolveSkillRoutes } from "../skill-injection.ts";
 
 const CONTEXT_EVENTS = new Set(["SessionStart", "SubagentStart"]);
 
-function configuredInstructionFiles(configPath: string, required = false): string[] {
+function configuredInstructions(configPath: string, workspace: string, required = false): string[] {
   if (!required && !existsSync(configPath)) {
     return [];
   }
@@ -20,12 +21,22 @@ function configuredInstructionFiles(configPath: string, required = false): strin
     throw new Error(`${configPath}: missing [instructions] table`);
   }
   const files = (instructions as Record<string, unknown>).files;
-  if (!Array.isArray(files) || files.length === 0 || files.some((file) => typeof file !== "string" || !file.trim())) {
+  const skills = (instructions as Record<string, unknown>).skills;
+  if (files === undefined && skills === undefined) {
+    throw new Error(`${configPath}: instructions needs files or skills`);
+  }
+  if (files !== undefined && (!Array.isArray(files) || files.length === 0 || files.some((file) => typeof file !== "string" || !file.trim()))) {
     throw new Error(`${configPath}: instructions.files must be a non-empty array of paths`);
+  }
+  if (skills !== undefined && (!Array.isArray(skills) || skills.length === 0 || skills.some((skill) => typeof skill !== "string" || !skill.trim()))) {
+    throw new Error(`${configPath}: instructions.skills must be a non-empty array of names`);
+  }
+  if (Array.isArray(skills) && new Set(skills).size !== skills.length) {
+    throw new Error(`${configPath}: instructions.skills must not contain duplicates`);
   }
 
   const configDirectory = realpathSync(dirname(configPath));
-  const resolved = files.map((file) => {
+  const resolved = ((files ?? []) as string[]).map((file) => {
     const path = file as string;
     if (isAbsolute(path)) throw new Error(`${configPath}: instruction paths must be relative`);
     const candidate = realpathSync(resolve(configDirectory, path));
@@ -38,7 +49,10 @@ function configuredInstructionFiles(configPath: string, required = false): strin
   if (new Set(resolved).size !== resolved.length) {
     throw new Error(`${configPath}: instructions.files must not contain duplicates`);
   }
-  return resolved;
+  return [
+    ...resolved.map((file) => readFileSync(file, "utf8")),
+    ...resolveSkillRoutes(workspace, (skills ?? []) as string[]),
+  ];
 }
 
 export const injectWorkspaceContext: HookStage = {
@@ -49,10 +63,10 @@ export const injectWorkspaceContext: HookStage = {
     const globalConfig = join(initializeUserData(), "config.toml");
     const selected = process.env.GEIST_CONFIG_FILE?.trim();
     const localConfig = selected || join(request.workspace, ".geist", "config.toml");
-    const files = configuredInstructionFiles(globalConfig);
-    if (resolve(localConfig) !== resolve(globalConfig)) files.push(...configuredInstructionFiles(localConfig, !!selected));
-    for (const file of files) {
-      appendInstructions(response, readFileSync(file, "utf8"));
+    const instructions = configuredInstructions(globalConfig, request.workspace);
+    if (resolve(localConfig) !== resolve(globalConfig)) instructions.push(...configuredInstructions(localConfig, request.workspace, !!selected));
+    for (const instruction of instructions) {
+      appendInstructions(response, instruction);
     }
   },
 };

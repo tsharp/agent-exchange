@@ -27,7 +27,7 @@ test.after(() => {
 
 const environment = { ...process.env, PLUGIN_ROOT: installed };
 for (const key of Object.keys(environment)) {
-  if (key.startsWith("GEIST_")) delete environment[key];
+  if (key.startsWith("GEIST_") && key !== "GEIST_USER_DIR") delete environment[key];
 }
 
 for (const host of ["codex", "copilot"]) {

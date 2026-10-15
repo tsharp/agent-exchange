@@ -2,7 +2,7 @@
 
 Geist provides ordered workspace instructions and local document retrieval for GitHub Copilot and OpenAI Codex. When RAG is enabled, each user prompt receives a few relevant chunks that the agent can choose to investigate. Geist does not capture or store conversation logs.
 
-Geist is installed as `geist@agent-exchange`. It includes its own Markdown-record MCP server and optional external-controller support. The original Geist's skills and Mimir server are not included.
+Geist is installed as `geist@agent-exchange`. It includes a style-routing setup skill, its own Markdown-record MCP server, and optional external-controller support. The original Geist's skills and Mimir server are not included.
 
 ## Install
 
@@ -63,6 +63,61 @@ Instructions belong in each consuming project. Installing the plugin does not cr
 
 ## Configure workspace instructions
 
+### Style skills
+
+Geist ships `swe-init`, a generic setup workflow. Personal style rules, interviews,
+and implementation samples belong in the user's data directory, outside this
+public plugin. Keep personal skills in `~/.geist/skills/<name>/SKILL.md` (or
+`GEIST_USER_DIR/skills`), with supporting references inside each package. Keep
+interviews and proposals under `~/.geist/docs` and implementation evidence under
+`~/.geist/samples`; those directories are outside instruction routing.
+
+Select existing packages in global or workspace configuration:
+
+```toml
+[instructions]
+skills = ["my-communication-style", "my-engineering-style"]
+```
+
+Names above are examples, not bundled skills. At session and subagent startup,
+Geist injects each configured skill's scope and canonical path in TOML order.
+The agent reads and applies the full skill and task-relevant references when
+its scope matches. This requires neither RAG nor an external controller. Full
+bodies remain outside hook context; long paths or many selections may require
+raising `additionalContextLimit` in the active host registration.
+
+Skills resolve from workspace `.agents/skills`, `.github/skills`, and `skills`,
+the personal data directory's `skills`, and Geist's installed `skills`. Missing
+or ambiguous names fail. Multiple paths to the same physical file count once.
+Keep one canonical copy rather than copying personal styles into the plugin.
+
+Invoke `swe-init` to configure selected styles, or run its bundled script from
+the Geist copy whose hooks are active:
+
+```powershell
+node "<geist>/skills/swe-init/scripts/setup.mjs" --global --skill my-engineering-style --check
+node "<geist>/skills/swe-init/scripts/setup.mjs" --global --skill my-engineering-style
+node "<geist>/skills/swe-init/scripts/setup.mjs" --global --check
+```
+
+Repeat `--skill` to select several packages. Use `--workspace "C:/work/project"`
+instead of `--global` for project scope. Writes require explicit selections;
+`--check` alone validates existing routes. Setup validates routes before writing,
+preserves existing files, other skill selections, and RAG settings, and saves
+the original config bytes to `config.toml.swe-init-backup` on its first change.
+Rewritten TOML normalizes comments and formatting; repeated setup is unchanged.
+
+Restart the host and review changed hooks as required, then verify the selected
+routes in a fresh session. A source checkout can serve as the active Geist copy
+when its built compatibility hooks are registered; keep it at that path and
+rebuild after source changes. Setup and command-output checks do not prove live
+host delivery or trust.
+
+The [skills index](skills/README.md) and [storage contract](docs/swe-kit/README.md)
+explain the public/private boundary and the separate style-authoring workflow.
+
+### Ordered files and skills
+
 `.geist/config.toml` defines which instruction files Geist loads and their order:
 
 ```toml
@@ -70,7 +125,11 @@ Instructions belong in each consuming project. Installing the plugin does not cr
 files = ["instructions.md", "architecture.md", "conventions.md"]
 ```
 
-Geist loads only the listed files, in exactly the order they appear in `files`. No instruction filenames receive special treatment, and an absent `.geist/config.toml` means no workspace instructions are loaded.
+Geist loads only the listed files, in exactly the order they appear in `files`,
+then the configured skill routes in `skills` order. Either list may be omitted;
+each provided list must be nonempty and contain no duplicates. No instruction
+filenames receive special treatment, and an absent `.geist/config.toml` means
+no workspace instructions are loaded. Global configuration is independent.
 
 Create every file listed in `files`. The list must be nonempty and contain no duplicate paths. Paths are relative to the config file's directory and must resolve inside it. A missing configured file, invalid TOML, or a path outside that directory fails the hook.
 

@@ -8,7 +8,7 @@ Each plugin lives under `plugins/<plugin-name>/` and can contain its own skills,
 
 | Plugin | Description | Documentation |
 | --- | --- | --- |
-| Geist | Ordered workspace instructions, local ONNX document retrieval, and Markdown-record tools | [Installation, configuration, and usage](./plugins/geist/README.md) |
+| Geist | SWE style skills, ordered instructions, local ONNX retrieval, and Markdown-record tools | [Installation, configuration, and usage](./plugins/geist/README.md) |
 
 ## Register the marketplace
 

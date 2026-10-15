@@ -1,6 +1,6 @@
 {
   "name": "geist",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Geist tools and workflows for GitHub Copilot and OpenAI Codex.",
   "author": {
     "name": "tsharp",
@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "Geist",
     "shortDescription": "Use Geist in Codex.",
-    "longDescription": "Lifecycle hooks for workspace instructions and optional external controllers. The first plugin in the Agent Exchange marketplace.",
+    "longDescription": "SWE style skills, ordered instruction routing, local document retrieval, and optional external controllers.",
     "developerName": "tsharp",
     "category": "Productivity",
     "capabilities": [],

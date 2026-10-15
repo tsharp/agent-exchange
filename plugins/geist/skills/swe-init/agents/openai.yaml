@@ -1,0 +1,3 @@
+interface:
+  display_name: "SWE Init"
+  short_description: "Route selected personal or workspace styles"

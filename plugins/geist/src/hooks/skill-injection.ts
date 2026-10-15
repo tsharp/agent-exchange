@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
+import { userDataDirectory } from "../rag/config.ts";
 
 const PLUGIN_SKILLS = resolve(dirname(fileURLToPath(import.meta.url)), "../../skills");
 const SKILL_NAME = /^[a-z0-9][a-z0-9-]*$/;
@@ -22,12 +24,13 @@ function withoutFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
 }
 
-export function resolveSkillInstructions(workspace: string, names: readonly string[]): string[] {
+export function resolveSkills(workspace: string, names: readonly string[], pluginSkills = PLUGIN_SKILLS): { name: string; path: string }[] {
   const roots = [
     join(workspace, ".agents", "skills"),
     join(workspace, ".github", "skills"),
     join(workspace, "skills"),
-    PLUGIN_SKILLS,
+    join(userDataDirectory(), "skills"),
+    pluginSkills,
   ];
 
   return names.map((name) => {
@@ -40,7 +43,24 @@ export function resolveSkillInstructions(workspace: string, names: readonly stri
     if (matches.size > 1) throw new Error(`injected skill '${name}' is ambiguous`);
 
     const [path] = matches.values();
-    const content = withoutFrontmatter(readFileSync(path, "utf8"));
-    return `[Activated skill: ${name}]\n${content}`;
+    return { name, path: realpathSync(path) };
+  });
+}
+
+export function resolveSkillInstructions(workspace: string, names: readonly string[]): string[] {
+  return resolveSkills(workspace, names).map(({ name, path }) =>
+    `[Activated skill: ${name}]\n${withoutFrontmatter(readFileSync(path, "utf8"))}`);
+}
+
+// Route to the canonical file rather than spending hook context on full skill bodies.
+export function resolveSkillRoutes(workspace: string, names: readonly string[], pluginSkills = PLUGIN_SKILLS): string[] {
+  return resolveSkills(workspace, names, pluginSkills).map(({ name, path }) => {
+    const content = readFileSync(path, "utf8");
+    const header = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content);
+    const metadata = header ? parse(header[1]) : undefined;
+    if (metadata?.name !== name || typeof metadata?.description !== "string" || !metadata.description.trim()) {
+      throw new Error(`routed skill '${name}' needs matching name and nonempty description`);
+    }
+    return `[Required skill routing: ${name}]\nScope: ${metadata.description.trim()}\nWhen this scope applies, read and apply ${JSON.stringify(path)} before that work, including its task-relevant references. Explicit task and project instructions govern.`;
   });
 }
