@@ -10,8 +10,9 @@ Geist ships these reusable workflows:
 | [swe-diagnose](swe-diagnose/SKILL.md) | Reproducing a software failure, investigating its cause, and verifying a correction |
 | [swe-prototype](swe-prototype/SKILL.md) | Resolving a concrete engineering or UI question with a small experiment |
 | [swe-review](swe-review/SKILL.md) | Reviewing requested behavior and confirmed standards in one actionable report |
-| [swe-improve-maintainability](swe-improve-maintainability/SKILL.md) | Evaluating maintenance friction with a scripted HTML report |
-| [swe-improve-architecture](swe-improve-architecture/SKILL.md) | Evaluating architecture with a scripted visual HTML report |
+| [swe-architecture](swe-architecture/SKILL.md) | Mapping current architecture, domains, terminology, dependencies, and flows |
+| [swe-improve-maintainability](swe-improve-maintainability/SKILL.md) | Finding and prioritizing maintenance improvements |
+| [swe-improve-architecture](swe-improve-architecture/SKILL.md) | Comparing architecture improvement candidates and exploring selected designs |
 | [swe-retro](swe-retro/SKILL.md) | Proposing evidence-backed improvements after significant work or recurring friction |
 | [slop-checker](slop-checker/SKILL.md) | Classifying a response, draft, code change, or assistant trace as slop or not slop, with evidence |
 
@@ -74,6 +75,19 @@ and dependency badges, expandable evidence, and a linked top recommendation.
 Architecture continues with focused exploration of the candidate the user
 chooses, including constraints, interface alternatives, migration, and tests.
 Each package includes a synthetic example assessment for previewing its report.
+
+`swe-architecture` surveys the whole repository or a named section and generates
+an Architecture report with system maps, domain relationships, component and
+data ownership, layer/dependency direction, runtime flows, scoped terminology,
+ambiguities, decisions, and evidence coverage. It adapts domain-modeling lenses
+without changing the project's glossary or promoting inferred meanings to
+confirmed definitions. Its script is independently installable and uses no npm
+dependencies. `assets/example-survey.json` provides a synthetic preview.
+
+The earlier `swe-architecture` improvement workflow is now
+`swe-improve-architecture`; the earlier `swe-maintainability` workflow is now
+`swe-improve-maintainability`. Update configured routes and invocations to retain
+that behavior. `swe-architecture` now selects the descriptive survey.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their

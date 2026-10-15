@@ -73,6 +73,16 @@ candidate exploration guide inside the independent package. Report-only
 requests still end with the report. Findings are agent-authored evidence,
 not automated measurements of code quality or permission to refactor.
 
+`swe-architecture` separately surveys current structure and contextual language.
+It owns its report schema, diagrams, domain lenses, and offline renderer. Keep
+observed architecture distinct from plans and proposed improvements, inferred
+domains distinct from established contexts, and report terminology distinct from
+accepted glossary edits. Tests use synthetic repositories and scoped terms.
+The previous broad skill names are renamed to `swe-improve-architecture` and
+`swe-improve-maintainability`; migration documentation must make clear that
+`swe-architecture` now selects a descriptive survey. Keep all three packages
+independent, without hidden dependencies on sibling skills or private evidence.
+
 Keep adaptation provenance in the plugin README's
 [skill provenance](../../README.md#skill-provenance) section, outside instruction
 bodies. Record the marked upstream package version, exact source revision, each

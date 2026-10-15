@@ -1,0 +1,540 @@
+{
+  "schemaVersion": 1,
+  "kind": "architecture-survey",
+  "project": "Order platform",
+  "purpose": "Accept customer orders and coordinate fulfillment.",
+  "scope": "Synthetic example of the whole platform",
+  "scopeType": "repository",
+  "revision": "synthetic fixture",
+  "worktree": "not-git",
+  "summary": "Ordering owns commercial acceptance; Fulfillment owns execution. Application workflows depend on domain rules and storage interfaces, with transport and persistence composed at the edge.",
+  "inspected": [
+    "Synthetic ordering and fulfillment fixture; no real repository was surveyed."
+  ],
+  "excluded": [],
+  "limits": [
+    "Synthetic source locations demonstrate the report format."
+  ],
+  "questions": [
+    "Does the fulfillment work item need its own term instead of Order?"
+  ],
+  "coverage": [
+    {
+      "dimension": "System context",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    },
+    {
+      "dimension": "Domains and terminology",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    },
+    {
+      "dimension": "Components and layers",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    },
+    {
+      "dimension": "Dependencies",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    },
+    {
+      "dimension": "Runtime flows",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    },
+    {
+      "dimension": "Decisions",
+      "status": "assessed",
+      "reason": "Mapped synthetic fixture behavior."
+    }
+  ],
+  "domains": [
+    {
+      "id": "ordering",
+      "name": "Ordering",
+      "responsibility": "Owns customer purchase requests, commercial validation, pricing, and acceptance.",
+      "classification": "business",
+      "paths": [
+        "src/ordering/"
+      ],
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/order.ts",
+          "line": 1,
+          "detail": "Order invariants are owned by Ordering."
+        }
+      ]
+    },
+    {
+      "id": "fulfillment",
+      "name": "Fulfillment",
+      "responsibility": "Owns work allocation and shipment after acceptance.",
+      "classification": "business",
+      "paths": [
+        "src/fulfillment/"
+      ],
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/fulfillment/work.ts",
+          "line": 1,
+          "detail": "Shipment work is owned by Fulfillment."
+        }
+      ]
+    }
+  ],
+  "domainRelations": [
+    {
+      "from": "ordering",
+      "to": "fulfillment",
+      "relationship": "Accepted orders become fulfillment work through an event contract.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/contracts/order-accepted.ts",
+          "line": 1,
+          "detail": "Order acceptance is the integration contract."
+        }
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "name": "Domain",
+      "responsibility": "Own invariants and domain outcomes.",
+      "allowedDependencies": [],
+      "enforcement": "Synthetic architecture test forbids infrastructure imports.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "tests/architecture.test.ts",
+          "line": 1,
+          "detail": "Domain cannot import adapters."
+        }
+      ]
+    },
+    {
+      "name": "Application",
+      "responsibility": "Coordinate domain operations and persistence contracts.",
+      "allowedDependencies": [
+        "Domain"
+      ],
+      "enforcement": "Synthetic architecture test checks direction.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "tests/architecture.test.ts",
+          "line": 1,
+          "detail": "Application depends on Domain."
+        }
+      ]
+    },
+    {
+      "name": "Composition",
+      "responsibility": "Wire transport and storage adapters to workflows.",
+      "allowedDependencies": [
+        "Application",
+        "Domain"
+      ],
+      "enforcement": "Composition is the outermost layer in the synthetic policy.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "tests/architecture.test.ts",
+          "line": 1,
+          "detail": "Composition wires adapters."
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "intake",
+      "name": "Order intake",
+      "responsibility": "Coordinate acceptance and persist the result.",
+      "domainIds": [
+        "ordering"
+      ],
+      "layer": "Application",
+      "paths": [
+        "src/ordering/intake.ts"
+      ],
+      "interfaces": [
+        "submit(order) → acceptance outcome"
+      ],
+      "data": [
+        "In-flight order; durable order state belongs to storage."
+      ],
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/intake.ts",
+          "line": 1,
+          "detail": "Coordinates domain validation and save."
+        }
+      ]
+    },
+    {
+      "id": "rules",
+      "name": "Order rules",
+      "responsibility": "Protect commercial invariants and pricing.",
+      "domainIds": [
+        "ordering"
+      ],
+      "layer": "Domain",
+      "paths": [
+        "src/ordering/order.ts"
+      ],
+      "interfaces": [
+        "accept(order) → accepted order or rejection"
+      ],
+      "data": [
+        "Validated order value"
+      ],
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/order.ts",
+          "line": 1,
+          "detail": "Validation constructs an accepted order."
+        }
+      ]
+    },
+    {
+      "id": "worker",
+      "name": "Fulfillment worker",
+      "responsibility": "Turn acceptance events into shipment work.",
+      "domainIds": [
+        "fulfillment"
+      ],
+      "layer": "Application",
+      "paths": [
+        "src/fulfillment/work.ts"
+      ],
+      "interfaces": [
+        "handle(OrderAccepted)"
+      ],
+      "data": [
+        "Shipment work state"
+      ],
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/fulfillment/work.ts",
+          "line": 1,
+          "detail": "Consumes accepted-order events."
+        }
+      ]
+    }
+  ],
+  "externals": [
+    {
+      "id": "customer",
+      "name": "Customer client",
+      "role": "Submits orders through transport outside this source fixture.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/transport/orders.ts",
+          "line": 1,
+          "detail": "HTTP requests enter intake."
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "name": "Order database",
+      "role": "Persists accepted orders through an adapter.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/adapters/order-store.ts",
+          "line": 1,
+          "detail": "Storage adapter persists order state."
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "customer",
+      "to": "intake",
+      "kind": "runtime",
+      "relationship": "Submits an order request.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/transport/orders.ts",
+          "line": 1,
+          "detail": "Transport delegates to intake."
+        }
+      ]
+    },
+    {
+      "from": "intake",
+      "to": "rules",
+      "kind": "compile",
+      "relationship": "Uses domain validation and pricing.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/intake.ts",
+          "line": 1,
+          "detail": "Imports order rules."
+        }
+      ]
+    },
+    {
+      "from": "intake",
+      "to": "database",
+      "kind": "data",
+      "relationship": "Persists the accepted outcome through a storage interface.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/intake.ts",
+          "line": 1,
+          "detail": "Saves accepted order."
+        }
+      ]
+    },
+    {
+      "from": "intake",
+      "to": "worker",
+      "kind": "event",
+      "relationship": "Accepted-order event triggers fulfillment.",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/contracts/order-accepted.ts",
+          "line": 1,
+          "detail": "Worker consumes acceptance contract."
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "title": "System context",
+      "description": "Actors, major capabilities, and durable storage.",
+      "diagram": {
+        "nodes": [
+          "Customer client",
+          "Ordering",
+          "Fulfillment",
+          "Order database"
+        ],
+        "edges": [
+          [
+            "Customer client",
+            "Ordering"
+          ],
+          [
+            "Ordering",
+            "Fulfillment"
+          ],
+          [
+            "Ordering",
+            "Order database"
+          ]
+        ],
+        "meaning": "Arrows show request, event, or persistence interaction as described in Dependencies."
+      },
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/composition.ts",
+          "line": 1,
+          "detail": "Wires request handling, storage, and fulfillment."
+        }
+      ]
+    },
+    {
+      "title": "Domain relationship map",
+      "description": "Commercial acceptance and shipment execution are distinct contexts.",
+      "diagram": {
+        "nodes": [
+          "Ordering",
+          "Fulfillment"
+        ],
+        "edges": [
+          [
+            "Ordering",
+            "Fulfillment"
+          ]
+        ],
+        "meaning": "An arrow means publishes an acceptance event consumed by the other context."
+      },
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/contracts/order-accepted.ts",
+          "line": 1,
+          "detail": "Acceptance crosses the context boundary."
+        }
+      ]
+    },
+    {
+      "title": "Layer direction",
+      "description": "Allowed dependencies are declared in the synthetic architecture policy.",
+      "diagram": {
+        "layout": "layers",
+        "nodes": [
+          "Composition",
+          "Application",
+          "Domain"
+        ],
+        "edges": [
+          [
+            "Composition",
+            "Application"
+          ],
+          [
+            "Application",
+            "Domain"
+          ]
+        ],
+        "meaning": "Top depends on lower layers. Allowed edges are listed in the layer table."
+      },
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "tests/architecture.test.ts",
+          "line": 1,
+          "detail": "Policy checks dependency direction."
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "title": "Accept an order",
+      "description": "One representative successful request; rejected orders return before persistence.",
+      "diagram": {
+        "nodes": [
+          "Customer client",
+          "Order intake",
+          "Order rules",
+          "Order database"
+        ],
+        "edges": [
+          [
+            "Customer client",
+            "Order intake"
+          ],
+          [
+            "Order intake",
+            "Order rules"
+          ],
+          [
+            "Order intake",
+            "Order database"
+          ]
+        ],
+        "meaning": "Arrows show calls; intake invokes rules before saving a valid result."
+      },
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/ordering/intake.ts",
+          "line": 1,
+          "detail": "Validation precedes persistence."
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Order",
+      "domainId": "ordering",
+      "definition": "A customer purchase request with commercial acceptance rules.",
+      "aliases": [
+        "Purchase request"
+      ],
+      "codeNames": [
+        "Order",
+        "AcceptedOrder"
+      ],
+      "status": "inferred",
+      "evidence": [
+        {
+          "path": "src/ordering/order.ts",
+          "line": 1,
+          "detail": "Commercial order state and invariants."
+        }
+      ]
+    },
+    {
+      "term": "Order",
+      "domainId": "fulfillment",
+      "definition": "A unit of execution work prepared for shipment.",
+      "aliases": [
+        "Work item"
+      ],
+      "codeNames": [
+        "FulfillmentOrder"
+      ],
+      "status": "inferred",
+      "evidence": [
+        {
+          "path": "src/fulfillment/work.ts",
+          "line": 1,
+          "detail": "Order means an execution task in this context."
+        }
+      ]
+    },
+    {
+      "term": "OrderAccepted",
+      "domainId": "ordering",
+      "definition": "A notification that commercial acceptance completed.",
+      "aliases": [],
+      "codeNames": [
+        "OrderAccepted"
+      ],
+      "status": "established",
+      "evidence": [
+        {
+          "path": "GLOSSARY.md",
+          "line": 1,
+          "detail": "The synthetic glossary defines the acceptance notification."
+        }
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "term": "Order",
+      "contexts": [
+        "ordering",
+        "fulfillment"
+      ],
+      "description": "The same term describes a purchase request and a shipment work item.",
+      "question": "Should Fulfillment use ShipmentWork to make the distinction explicit?",
+      "evidence": [
+        {
+          "path": "src/fulfillment/work.ts",
+          "line": 1,
+          "detail": "Execution meaning differs from commercial acceptance."
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "title": "Keep persistence outside domain rules",
+      "decision": "The domain has no storage dependency; application coordinates persistence through a contract.",
+      "consequence": "Storage changes remain in adapters; domain tests need no database.",
+      "status": "documented",
+      "evidence": [
+        {
+          "path": "docs/adr/0001-storage.md",
+          "line": 1,
+          "detail": "Synthetic ADR records the storage boundary."
+        }
+      ]
+    }
+  ]
+}

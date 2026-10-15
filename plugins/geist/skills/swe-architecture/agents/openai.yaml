@@ -1,0 +1,3 @@
+interface:
+  display_name: "SWE Architecture"
+  short_description: "Map architecture, domains, terminology, and flows"

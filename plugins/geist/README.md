@@ -110,6 +110,18 @@ configured personal styles. Review does not require parallel agents, and a
 retrospective does not automatically add rules or edit configuration. The
 [skills index](skills/README.md) lists all workflows and their intended scope.
 
+Use `swe-architecture` to understand the current repository or a named section:
+
+```text
+Use $swe-architecture to map this repository's architecture and domain terminology.
+Use $swe-architecture to examine plugins/geist/src/rag and its surrounding dependencies.
+```
+
+It generates an Architecture report with system and domain maps, components,
+layers, data ownership, directed dependencies, runtime flows, contextual
+terminology, ambiguities, decisions, and evidence limits. Inferred domains and
+terms remain labeled. The survey does not rewrite the project's glossary.
+
 Use `swe-improve-maintainability` to evaluate maintenance costs or `swe-improve-architecture` to
 evaluate module depth, dependencies, and responsibility boundaries:
 
@@ -349,13 +361,13 @@ This executes the configured startup hook and prints its stderr alongside protoc
 
 ## Skill provenance
 
-Five workflows below adapt Matt Pocock's
+Six workflows below adapt Matt Pocock's
 [skills repository](https://github.com/mattpocock/skills/tree/49dd158d1076134a641b33efb035946536778336).
 The source package is marked **1.3.1** at commit
 `49dd158d1076134a641b33efb035946536778336`; this is the pinned source snapshot,
 not a claim that each upstream skill has its own version tag.
 
-All five adaptations follow the communication, general engineering, and language
+All six adaptations follow the communication, general engineering, and language
 styles selected by active instructions. They keep personal prescriptions in the
 consuming user's canonical packages and use those terms and confirmed rules.
 
@@ -366,6 +378,7 @@ consuming user's canonical packages and use those terms and confirmed rules.
 | [swe-review 1.0.1](skills/swe-review/SKILL.md) | [code-review](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/code-review/SKILL.md) | Assesses behavior and standards separately, then combines findings by consequence; makes delegation optional; removes tracker setup and the mandatory generic smell baseline; accepts conversation requirements; covers staged, unstaged, and relevant untracked changes; infers an established review scope when possible. |
 | [swe-retro 1.0.1](skills/swe-retro/SKILL.md) | [retro](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/retro/SKILL.md) | Uses observed friction and prevention value to justify changes; checks existing tooling first; avoids mandatory new checks or rules for isolated mistakes; keeps standards applicable during implementation and review; distinguishes proposed preferences from confirmed rules and findings from authorized edits. |
 | [swe-improve-architecture 2.0.0](skills/swe-improve-architecture/SKILL.md) | [improve-codebase-architecture](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/improve-codebase-architecture/SKILL.md) and [codebase-design](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/codebase-design/SKILL.md) | Retains hotspot exploration, depth, the deletion test, locality, and visual before/after candidates; adds dependency direction, ownership, explicit evidence and coverage; follows active terminology and contextual adapter decisions; recreates visual candidate cards with diagram variety, strength and dependency badges, ADR warnings, and a linked top recommendation through a bundled offline generator; restores candidate selection and focused design exploration without mandatory delegation or unauthorized code edits. |
+| [swe-architecture 1.0.0](skills/swe-architecture/SKILL.md) | [domain-modeling](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/domain-modeling/SKILL.md), its glossary/ADR formats, and the architecture report design | Adapts context-specific terms, glossary maps, semantic definitions, aliases, contradictions, concrete scenarios, and decision criteria into an evidence-backed current-system survey; adds system/domain/component diagrams, layer and dependency maps, data ownership, runtime flows, coverage, and a standalone offline generator; keeps inferred terms and contexts explicit and glossary/ADR writes outside survey scope. |
 
 Version 1.0.0 introduced each adaptation. For the first four, version 1.0.1 moves
 provenance here from the skill bodies without changing their workflows. Each independent
@@ -397,6 +410,15 @@ Version 2.0.0 renames these packages to `swe-improve-architecture` and
 descriptive survey. Update configured skill names and direct invocations when
 migrating from `swe-architecture` or `swe-maintainability`. Assessment JSON kinds
 remain `architecture` and `maintainability` for compatibility.
+The new `swe-architecture` name now selects the descriptive survey. To retain
+the earlier improvement workflow in startup routes, select
+`swe-improve-architecture` instead.
+
+`swe-architecture` starts at version 1.0.0 with a separate
+`architecture-survey` input contract and the report title Architecture. Run
+`node <skill-directory>/scripts/generate-report.mjs <survey.json> [new-report.html]`.
+Its synthetic preview is `assets/example-survey.json`; maps and terminology
+describe current structure, without before/after refactoring recommendations.
 
 [slop-checker 1.1.0](skills/slop-checker/SKILL.md) is an original, research-informed
 workflow, not an adaptation of an upstream skill. Its
