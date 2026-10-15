@@ -67,7 +67,10 @@ script-generated offline HTML reports. Keep their report scripts and contracts
 inside each package so either can be installed independently. Tests exercise
 both isolated packages, input validation, escaping, diagrams, and partial or empty
 evaluations. Their renderer copies are kept aligned by a parity check; maintain
-the rendering contract in both packages. Findings are agent-authored evidence,
+the rendering contract, visual assets, and layout support in both packages.
+Architecture preserves the explore/report/select/design workflow, with its
+candidate exploration guide inside the independent package. Report-only
+requests still end with the report. Findings are agent-authored evidence,
 not automated measurements of code quality or permission to refactor.
 
 Keep adaptation provenance in the plugin README's

@@ -69,6 +69,11 @@ without npm dependencies. Evaluation does not authorize implementation. The
 maintainability workflow assesses understanding, change cost, state and failures,
 verification, and operations; architecture assesses module depth, locality,
 dependency direction, ownership, and testability with before/after diagrams.
+Reports use visual candidate comparisons, short problem/solution text, strength
+and dependency badges, expandable evidence, and a linked top recommendation.
+Architecture continues with focused exploration of the candidate the user
+chooses, including constraints, interface alternatives, migration, and tests.
+Each package includes a synthetic example assessment for previewing its report.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their

@@ -52,7 +52,7 @@ for (const kind of ["maintainability", "architecture"]) {
       assert.ok(!html.includes("<script"));
       assert.ok(!html.includes('src="http'));
       assert.ok(html.includes("src/intake.mjs:12"));
-      assert.equal(html.includes("<svg"), kind === "architecture");
+      assert.ok(html.includes("<svg"));
       assert.equal(run(input, output).status, 1);
       assert.equal(await readFile(output, "utf8"), html);
       const mutations = [
@@ -62,6 +62,12 @@ for (const kind of ["maintainability", "architecture"]) {
         value => { value.coverage[1] = value.coverage[0]; },
         value => { value.coverage[0].status = "unexamined"; },
         value => { value.kind = "other"; },
+        value => { value.topFinding = 99; },
+        value => { value.findings[0].wins = []; },
+        value => { value.findings[0].before.layout = "unknown"; },
+        value => { value.findings[0].after = undefined; },
+        value => { value.findings[0].before.problemEdges = [["Missing", "Intake"]]; },
+        value => { value.findings[0].after.layout = "collapse"; },
       ];
       if (kind === "architecture") mutations.push(value => { value.findings[0].after.edges = [["Missing", "Intake"]]; });
       for (const mutate of mutations) {
@@ -84,6 +90,23 @@ for (const kind of ["maintainability", "architecture"]) {
         assert.ok(report.includes("unexamined"));
       }
       assert.notEqual(generated[0], generated[1]);
+      const example = join(installed, "assets/example-assessment.json");
+      const visualOutput = join(directory, "visual.html");
+      assert.equal(run(example, visualOutput).status, 0);
+      const visual = await readFile(visualOutput, "utf8");
+      for (const layout of ['class="layers"', 'class="module"', 'class="depth-view deep"']) assert.ok(visual.includes(layout));
+      const exampleData = JSON.parse(await readFile(example, "utf8"));
+      exampleData.topFinding = 2;
+      exampleData.findings[0].adrConflict = '<img src=x onerror="alert(1)">';
+      exampleData.findings[0].after.interface = '</div><script>alert(1)</script>';
+      exampleData.findings[0].wins = ['<script>bad()</script>'];
+      await writeFile(input, JSON.stringify(exampleData));
+      const escapedOutput = join(directory, "escaped.html");
+      assert.equal(run(input, escapedOutput).status, 0);
+      const escaped = await readFile(escapedOutput, "utf8");
+      assert.ok(!escaped.includes("<script"));
+      assert.ok(!escaped.includes("<img"));
+      assert.ok(escaped.includes('href="#finding-3">Explore candidate 03'));
       await writeFile(input, "{broken");
       assert.equal(run(input).status, 1);
     } finally {
@@ -97,4 +120,7 @@ test("independent generator copies share the renderer contract", async () => {
   const first = await readFile(join(skills, "swe-maintainability/scripts/generate-report.mjs"), "utf8");
   const second = await readFile(join(skills, "swe-architecture/scripts/generate-report.mjs"), "utf8");
   assert.equal(second, first.replace('const kind = "maintainability";', 'const kind = "architecture";'));
+  for (const path of ["scripts/diagrams.mjs", "scripts/report-view.mjs", "assets/report.css"]) {
+    assert.equal(await readFile(join(skills, "swe-architecture", path), "utf8"), await readFile(join(skills, "swe-maintainability", path), "utf8"));
+  }
 });

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "kind": "architecture",
+  "project": "Order intake",
+  "scope": "Synthetic example · visual review preview",
+  "revision": "example / not repository evidence",
+  "worktree": "not-git",
+  "summary": "Three examples show how caller coordination, layered indirection, and interface obligations can concentrate in a single owner. These candidates demonstrate the report format; they are not findings about your repository.",
+  "inspected": [
+    "Synthetic order intake fixture; no repository evaluation performed."
+  ],
+  "excluded": [],
+  "strengths": [
+    "A persistence adapter already isolates database details.",
+    "Caller-facing error behavior has contract tests worth preserving."
+  ],
+  "limits": [
+    "Synthetic example only; source locations and observations illustrate the format."
+  ],
+  "coverage": [
+    {
+      "dimension": "Module depth",
+      "status": "assessed",
+      "reason": "Inspected fixture path."
+    },
+    {
+      "dimension": "Change locality",
+      "status": "assessed",
+      "reason": "Inspected fixture path."
+    },
+    {
+      "dimension": "Dependency direction",
+      "status": "assessed",
+      "reason": "Inspected fixture path."
+    },
+    {
+      "dimension": "Boundary ownership",
+      "status": "assessed",
+      "reason": "Inspected fixture path."
+    },
+    {
+      "dimension": "Testability",
+      "status": "assessed",
+      "reason": "Inspected fixture path."
+    }
+  ],
+  "findings": [
+    {
+      "title": "Give order intake one owner",
+      "dimension": "Module depth",
+      "strength": "Strong",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/intake.mjs",
+          "line": 12,
+          "detail": "Callers repeat validation."
+        }
+      ],
+      "observation": "HTTP and batch callers repeat the same validation and pricing decisions.",
+      "consequence": "Rule updates need coordinated edits.",
+      "proposal": "Keep intake decisions behind one interface; let callers supply an order and receive its outcome.",
+      "benefits": "One place to change the rule.",
+      "tradeoffs": "Preserve caller error contracts.",
+      "verification": "Exercise both callers with invalid input.",
+      "decisions": "No applicable ADR in fixture.",
+      "before": {
+        "nodes": [
+          "HTTP caller",
+          "Batch caller",
+          "Validation",
+          "Pricing"
+        ],
+        "edges": [
+          [
+            "HTTP caller",
+            "Validation"
+          ],
+          [
+            "HTTP caller",
+            "Pricing"
+          ],
+          [
+            "Batch caller",
+            "Validation"
+          ],
+          [
+            "Batch caller",
+            "Pricing"
+          ]
+        ],
+        "problemEdges": [
+          [
+            "HTTP caller",
+            "Pricing"
+          ],
+          [
+            "Batch caller",
+            "Pricing"
+          ]
+        ],
+        "meaning": "Arrows mean calls. Red edges repeat caller-owned coordination.",
+        "layout": "flow"
+      },
+      "after": {
+        "nodes": [
+          "Validate order",
+          "Calculate price",
+          "Persist outcome",
+          "Return result"
+        ],
+        "edges": [
+          [
+            "Validate order",
+            "Calculate price"
+          ],
+          [
+            "Calculate price",
+            "Persist outcome"
+          ],
+          [
+            "Persist outcome",
+            "Return result"
+          ]
+        ],
+        "label": "Order intake",
+        "interface": "Submit order → accepted or rejected",
+        "layout": "collapse",
+        "meaning": "One caller contract. Validation, pricing, and persistence coordination are internal."
+      },
+      "dependency": "in-process",
+      "wins": [
+        "One owner for intake rules",
+        "Callers stop coordinating steps",
+        "Tests exercise the full outcome"
+      ]
+    },
+    {
+      "title": "Collapse the pass-through pipeline",
+      "dimension": "Change locality",
+      "strength": "Worth exploring",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/intake.mjs",
+          "line": 12,
+          "detail": "Callers repeat validation."
+        }
+      ],
+      "observation": "A request crosses four thin forwarding modules before reaching the behavior tests need.",
+      "consequence": "A new validation rule requires changing forwarding arguments and several test setups.",
+      "proposal": "Concentrate the workflow inside intake and verify it through the same interface callers use.",
+      "benefits": "One place to change the rule.",
+      "tradeoffs": "Replace forwarding tests only after contract coverage protects their behavior.",
+      "verification": "Exercise accepted, rejected, and persistence-failure outcomes through intake with a local stand-in.",
+      "decisions": "No applicable ADR in fixture.",
+      "before": {
+        "layout": "layers",
+        "nodes": [
+          "HTTP handler",
+          "Intake facade",
+          "Validation dispatcher",
+          "Pricing coordinator",
+          "Persistence adapter"
+        ],
+        "edges": [
+          [
+            "HTTP handler",
+            "Intake facade"
+          ],
+          [
+            "Intake facade",
+            "Validation dispatcher"
+          ],
+          [
+            "Validation dispatcher",
+            "Pricing coordinator"
+          ],
+          [
+            "Pricing coordinator",
+            "Persistence adapter"
+          ]
+        ],
+        "emphasis": [
+          "Intake facade",
+          "Validation dispatcher"
+        ],
+        "meaning": "Top to bottom: request flow. Red bands are forwarding responsibilities."
+      },
+      "after": {
+        "layout": "collapse",
+        "label": "Order intake",
+        "interface": "Submit order → outcome",
+        "nodes": [
+          "Domain rules",
+          "Workflow",
+          "Persistence adapter",
+          "Error mapping"
+        ],
+        "edges": [],
+        "meaning": "Private responsibilities stay together; persistence remains substitutable."
+      },
+      "dependency": "local-substitutable",
+      "wins": [
+        "One meaningful test surface",
+        "Fewer forwarding contracts",
+        "Preserve persistence isolation"
+      ],
+      "adrConflict": "Revisits ADR-004: the current forwarding layers add no independent policy. Confirm that constraint still holds before consolidation."
+    },
+    {
+      "title": "Shrink what callers must know",
+      "dimension": "Module depth",
+      "strength": "Worth exploring",
+      "basis": "observed",
+      "evidence": [
+        {
+          "path": "src/intake.mjs",
+          "line": 12,
+          "detail": "Callers repeat validation."
+        }
+      ],
+      "observation": "Callers must normalize, validate, price, and save in a specific order.",
+      "consequence": "Rule updates need coordinated edits.",
+      "proposal": "Accept an order once and own the sequence and invariants inside intake.",
+      "benefits": "One place to change the rule.",
+      "tradeoffs": "Preserve caller error contracts.",
+      "verification": "Exercise both callers with invalid input.",
+      "decisions": "No applicable ADR in fixture.",
+      "before": {
+        "layout": "depth",
+        "label": "Behavior hidden today",
+        "interface": "normalize → validate → price → save",
+        "nodes": [
+          "Storage call"
+        ],
+        "edges": [],
+        "meaning": "Qualitative view: a broad caller contract hides little behavior."
+      },
+      "after": {
+        "layout": "depth",
+        "label": "Behavior hidden by intake",
+        "interface": "submit(order) → outcome",
+        "nodes": [
+          "Normalization",
+          "Invariant validation",
+          "Pricing decisions",
+          "Persistence and recovery"
+        ],
+        "edges": [],
+        "meaning": "Qualitative view: a smaller contract hides the workflow; sizes are not metrics."
+      },
+      "dependency": "in-process",
+      "wins": [
+        "Fewer caller obligations",
+        "Invariants have an owner",
+        "Internal changes stay local"
+      ]
+    }
+  ],
+  "recommendation": "Start with order intake ownership: it removes repeated caller decisions while preserving the persistence adapter and existing error contracts.",
+  "topFinding": 0
+}

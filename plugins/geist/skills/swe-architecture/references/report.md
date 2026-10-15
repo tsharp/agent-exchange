@@ -22,7 +22,7 @@ available local browser or document viewer and inspect scope, coverage, findings
 and layout before delivering it. Report any inability to inspect the rendering.
 Keep the assessment JSON available beside the report when practical for reuse.
 
-## Input schema, version 1
+## Input schema, version 1 (backward compatible)
 
 All fields below are required. Text fields must be nonempty. Empty arrays are
 allowed unless noted. JSON property order is immaterial; findings render in
@@ -87,3 +87,23 @@ Each finding also requires `before` and `after` objects. Each object contains
 Use concise node labels to keep diagrams legible. The generator renders static
 SVG diagrams and a textual edge list so direction is also available without
 interpreting curves. Before depicts inspected structure; after depicts a proposal.
+
+## Visual presentation fields
+
+Optional fields preserve compatibility with version 1 inputs:
+
+- `topFinding`: zero-based index of the top recommendation; defaults to the first finding. Omit for an empty evaluation.
+- Finding `wins`: nonempty array of short gains; `dependency`: `in-process`, `local-substitutable`, `ports & adapters`, or `mock`; `adrConflict`: text explaining a decision conflict that deserves attention.
+- Diagrams accept `layout`: `flow`, `layers`, `collapse`, or `depth`; defaults to `flow`. `collapse` and `depth` require nonempty `label` and `interface`. Optional `emphasis` lists existing node labels, and `problemEdges` lists existing directed edge pairs.
+
+Read [the visual guide](visuals.md) when preparing report inputs. Before/after
+diagrams are required for architecture findings. For maintainability findings
+they are optional in the schema; supply both when using either. Use them for
+the main findings so the maintenance cost and improvement are visible.
+
+The report foregrounds candidate comparisons, concise problem/solution text,
+colored strength and dependency badges, specific wins, ADR warnings, and a
+linked top recommendation. Detailed evidence and coverage remain accessible
+in native expandable sections. The report works offline without JavaScript.
+Use the package-local `assets/example-assessment.json` to generate a synthetic
+preview with multiple visual patterns.
