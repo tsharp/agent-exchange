@@ -110,12 +110,12 @@ configured personal styles. Review does not require parallel agents, and a
 retrospective does not automatically add rules or edit configuration. The
 [skills index](skills/README.md) lists all workflows and their intended scope.
 
-Use `swe-maintainability` to evaluate maintenance costs or `swe-architecture` to
+Use `swe-improve-maintainability` to evaluate maintenance costs or `swe-improve-architecture` to
 evaluate module depth, dependencies, and responsibility boundaries:
 
 ```text
-Use $swe-maintainability to evaluate this subsystem's maintenance costs.
-Use $swe-architecture to evaluate this subsystem's architecture.
+Use $swe-improve-maintainability to evaluate this subsystem's maintenance costs.
+Use $swe-improve-architecture to evaluate this subsystem's architecture.
 ```
 
 Each generates an offline HTML report through its bundled Node.js script,
@@ -365,7 +365,7 @@ consuming user's canonical packages and use those terms and confirmed rules.
 | [swe-prototype 1.0.1](skills/swe-prototype/SKILL.md) | [prototype](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/prototype/SKILL.md) | Supports CLI fixtures, language examples, benchmarks, and integration harnesses alongside UI demos; chooses the cheapest faithful experiment; permits useful assertions; makes branch archival optional; preserves the finding in an existing artifact. |
 | [swe-review 1.0.1](skills/swe-review/SKILL.md) | [code-review](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/code-review/SKILL.md) | Assesses behavior and standards separately, then combines findings by consequence; makes delegation optional; removes tracker setup and the mandatory generic smell baseline; accepts conversation requirements; covers staged, unstaged, and relevant untracked changes; infers an established review scope when possible. |
 | [swe-retro 1.0.1](skills/swe-retro/SKILL.md) | [retro](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/retro/SKILL.md) | Uses observed friction and prevention value to justify changes; checks existing tooling first; avoids mandatory new checks or rules for isolated mistakes; keeps standards applicable during implementation and review; distinguishes proposed preferences from confirmed rules and findings from authorized edits. |
-| [swe-architecture 1.1.0](skills/swe-architecture/SKILL.md) | [improve-codebase-architecture](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/improve-codebase-architecture/SKILL.md) and [codebase-design](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/codebase-design/SKILL.md) | Retains hotspot exploration, depth, the deletion test, locality, and visual before/after candidates; adds dependency direction, ownership, explicit evidence and coverage; follows active terminology and contextual adapter decisions; recreates visual candidate cards with diagram variety, strength and dependency badges, ADR warnings, and a linked top recommendation through a bundled offline generator; restores candidate selection and focused design exploration without mandatory delegation or unauthorized code edits. |
+| [swe-improve-architecture 2.0.0](skills/swe-improve-architecture/SKILL.md) | [improve-codebase-architecture](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/improve-codebase-architecture/SKILL.md) and [codebase-design](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/codebase-design/SKILL.md) | Retains hotspot exploration, depth, the deletion test, locality, and visual before/after candidates; adds dependency direction, ownership, explicit evidence and coverage; follows active terminology and contextual adapter decisions; recreates visual candidate cards with diagram variety, strength and dependency badges, ADR warnings, and a linked top recommendation through a bundled offline generator; restores candidate selection and focused design exploration without mandatory delegation or unauthorized code edits. |
 
 Version 1.0.0 introduced each adaptation. For the first four, version 1.0.1 moves
 provenance here from the skill bodies without changing their workflows. Each independent
@@ -373,7 +373,7 @@ package retains the upstream MIT copyright and license in its `LICENSE` file.
 Keep this section aligned with skill versions, pinned source revisions, and
 subsequent changes to the adaptations.
 
-[swe-maintainability 1.1.0](skills/swe-maintainability/SKILL.md) is an original
+[swe-improve-maintainability 2.0.0](skills/swe-improve-maintainability/SKILL.md) is an original
 workflow for evaluating comprehension, change locality, state and failures,
 verification, and operations. Its report presentation adapts the same pinned
 upstream architecture report design; both packages retain the MIT notice. Both
@@ -392,6 +392,11 @@ and collapsed-module diagrams; architecture also restores candidate selection
 and focused design exploration. Each package includes a synthetic example at
 `assets/example-assessment.json` for a reproducible preview. Existing schema
 version 1 inputs remain valid; the new presentation fields are additive.
+Version 2.0.0 renames these packages to `swe-improve-architecture` and
+`swe-improve-maintainability` to distinguish improvement candidates from a
+descriptive survey. Update configured skill names and direct invocations when
+migrating from `swe-architecture` or `swe-maintainability`. Assessment JSON kinds
+remain `architecture` and `maintainability` for compatibility.
 
 [slop-checker 1.1.0](skills/slop-checker/SKILL.md) is an original, research-informed
 workflow, not an adaptation of an upstream skill. Its

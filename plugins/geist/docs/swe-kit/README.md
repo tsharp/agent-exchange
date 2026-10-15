@@ -62,7 +62,7 @@ personal ownership: inferred preferences remain proposals, and canonical rules
 stay in the personal store. Standards apply during implementation and review.
 These workflows remain optional tools rather than a mandatory task pipeline.
 
-`swe-maintainability` and `swe-architecture` are evaluation workflows with
+`swe-improve-maintainability` and `swe-improve-architecture` are evaluation workflows with
 script-generated offline HTML reports. Keep their report scripts and contracts
 inside each package so either can be installed independently. Tests exercise
 both isolated packages, input validation, escaping, diagrams, and partial or empty

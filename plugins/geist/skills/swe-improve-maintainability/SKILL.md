@@ -1,13 +1,13 @@
 ---
-name: swe-maintainability
-description: Evaluate a codebase or subsystem for maintainability and generate an evidence-backed HTML report. Use for understanding change cost, testability, ownership, and recurring maintenance friction; use a change review for diff correctness.
+name: swe-improve-maintainability
+description: Find and prioritize maintainability improvements with a visual HTML report. Use for reducing change cost, improving testability and ownership, or addressing recurring maintenance friction; use a change review for diff correctness.
 metadata:
-  version: 1.1.0
+  version: 2.0.0
   updated: 2026-10-15
   status: stable
 ---
 
-# Evaluate maintainability
+# Find maintainability improvements
 
 ## Overview
 

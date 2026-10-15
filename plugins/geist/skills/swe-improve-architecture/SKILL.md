@@ -1,13 +1,13 @@
 ---
-name: swe-architecture
-description: Evaluate codebase architecture and generate a visual HTML report of evidence-backed improvements. Use for module depth, dependency direction, responsibility boundaries, and testability across a system or subsystem; use a change review for diff correctness.
+name: swe-improve-architecture
+description: Find architecture improvement candidates, generate a visual before/after report, and explore the selected design. Use for module deepening, dependency problems, responsibility changes, or architectural refactoring; a descriptive architecture survey is a separate task.
 metadata:
-  version: 1.1.0
+  version: 2.0.0
   updated: 2026-10-15
   status: stable
 ---
 
-# Evaluate architecture
+# Find architecture improvements
 
 ## Overview
 

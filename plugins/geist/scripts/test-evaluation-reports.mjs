@@ -36,7 +36,7 @@ for (const kind of ["maintainability", "architecture"]) {
     const generated = [];
     try {
       const installed = join(directory, "skill");
-      await cp(join(skills, `swe-${kind}`), installed, { recursive: true });
+      await cp(join(skills, `swe-improve-${kind}`), installed, { recursive: true });
       const input = join(directory, "assessment.json");
       const output = join(directory, "report with spaces.html");
       const run = (...args) => spawnSync(process.execPath, [join(installed, "scripts/generate-report.mjs"), ...args], { cwd: directory, encoding: "utf8" });
@@ -117,10 +117,10 @@ for (const kind of ["maintainability", "architecture"]) {
 }
 
 test("independent generator copies share the renderer contract", async () => {
-  const first = await readFile(join(skills, "swe-maintainability/scripts/generate-report.mjs"), "utf8");
-  const second = await readFile(join(skills, "swe-architecture/scripts/generate-report.mjs"), "utf8");
+  const first = await readFile(join(skills, "swe-improve-maintainability/scripts/generate-report.mjs"), "utf8");
+  const second = await readFile(join(skills, "swe-improve-architecture/scripts/generate-report.mjs"), "utf8");
   assert.equal(second, first.replace('const kind = "maintainability";', 'const kind = "architecture";'));
   for (const path of ["scripts/diagrams.mjs", "scripts/report-view.mjs", "assets/report.css"]) {
-    assert.equal(await readFile(join(skills, "swe-architecture", path), "utf8"), await readFile(join(skills, "swe-maintainability", path), "utf8"));
+    assert.equal(await readFile(join(skills, "swe-improve-architecture", path), "utf8"), await readFile(join(skills, "swe-improve-maintainability", path), "utf8"));
   }
 });

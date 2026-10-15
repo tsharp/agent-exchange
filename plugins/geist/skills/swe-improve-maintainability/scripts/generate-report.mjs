@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { render } from "./report-view.mjs";
 
 // Kept inside each package so either skill works when installed on its own.
-const kind = "architecture";
+const kind = "maintainability";
 const dimensions = kind === "architecture"
   ? ["Module depth", "Change locality", "Dependency direction", "Boundary ownership", "Testability"]
   : ["Comprehension", "Change locality", "State and failures", "Verification", "Operations and ownership"];
@@ -96,7 +96,7 @@ try {
     requireValue(args.length >= 1 && args.length <= 2, "Usage: node generate-report.mjs <assessment.json> [new-report.html]");
     const data = JSON.parse(await readFile(resolve(args[0]), "utf8"));
     validate(data);
-    const output = args[1] ? resolve(args[1]) : join(tmpdir(), `${kind}-review-${Date.now()}-${randomUUID()}.html`);
+    const output = args[1] ? resolve(args[1]) : join(tmpdir(), `${kind}-improvements-${Date.now()}-${randomUUID()}.html`);
     const css = await readFile(new URL("../assets/report.css", import.meta.url), "utf8");
     await writeFile(output, render(data, kind, css), { encoding: "utf8", flag: "wx" });
     console.log(output);
