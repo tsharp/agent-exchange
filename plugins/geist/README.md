@@ -65,12 +65,23 @@ Instructions belong in each consuming project. Installing the plugin does not cr
 
 ### Style skills
 
-Geist ships `swe-init`, a generic setup workflow. Personal style rules, interviews,
+Geist ships `swe-author` for creating or refining SWE skills and `swe-init` for
+activating existing packages. Personal style rules, interviews,
 and implementation samples belong in the user's data directory, outside this
 public plugin. Keep personal skills in `~/.geist/skills/<name>/SKILL.md` (or
 `GEIST_USER_DIR/skills`), with supporting references inside each package. Keep
 interviews and proposals under `~/.geist/docs` and implementation evidence under
 `~/.geist/samples`; those directories are outside instruction routing.
+
+Invoke `swe-author` with the intended scope and available evidence, for example:
+
+> Create a SWE testing skill from these projects. Interview me where the examples
+> leave choices unclear.
+
+The workflow records explicit requirements, proposes inferred preferences for
+confirmation, and packages and validates accepted guidance. It also supports
+refining an existing skill or authoring a project workflow. Creating a skill
+does not activate it; use `swe-init` when startup routing is wanted.
 
 Select existing packages in global or workspace configuration:
 

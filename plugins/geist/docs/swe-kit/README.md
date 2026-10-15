@@ -8,6 +8,7 @@ setup mechanism; consuming users own their style prescriptions and evidence.
 | Location | Content | Startup behavior |
 | --- | --- | --- |
 | Plugin `skills/swe-init/` | Generic configuration workflow and setup script | Used when setting up or repairing routes |
+| Plugin `skills/swe-author/` | Generic SWE skill authoring workflow | Used when creating or refining packages |
 | `~/.geist/skills/<name>/` | Personal skill, references, and lint policies | Routed only when selected in `instructions.skills` |
 | `~/.geist/docs/` | Personal interviews and proposals | Outside instruction routing |
 | `~/.geist/samples/` | Personal implementation evidence | Outside instruction routing |
@@ -25,11 +26,15 @@ routing. No personal style names or rules are built into the script. Geist
 injects scopes and canonical paths, and the agent reads applicable files.
 Global configuration precedes workspace configuration, preserving TOML order.
 
-For style authoring, review the user's representative samples and statements,
-record candidate interpretations as proposals, and confirm them before changing
+Use `swe-author` to create or refine SWE packages. For style authoring, review
+the user's representative samples and statements, record candidate
+interpretations as proposals, and confirm them before changing
 stable prescriptions. Preserve rule identifiers and owner-confirmed choices.
 Keep evidence separate from active instructions, supporting references inside
 the owning skill, and a single canonical `skills/` source in the personal store.
+Explicit user requirements are already confirmed; inferred preferences remain
+proposals until accepted. Validate the package before handing off to `swe-init`
+for requested activation. Authoring alone does not change startup routing.
 
 ## Verification
 

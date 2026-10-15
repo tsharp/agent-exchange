@@ -1,17 +1,25 @@
 # Geist skills
 
-Geist ships `swe-init`, a reusable workflow for routing selected style skills
-through standard startup instruction injection. It contains no personal style
-prescriptions, interview transcripts, or sample projects.
+Geist ships two reusable workflows:
+
+| Skill | Use for |
+| --- | --- |
+| [swe-author](swe-author/SKILL.md) | Creating or refining SWE skills from requirements and evidence |
+| [swe-init](swe-init/SKILL.md) | Routing selected existing skills through startup instruction injection |
+
+Neither contains personal style prescriptions, interview transcripts, or sample
+projects.
 
 Keep personal packages in `~/.geist/skills/<name>/SKILL.md` (or
 `GEIST_USER_DIR/skills`). Workspace packages can use `.agents/skills`,
 `.github/skills`, or `skills`. Each package remains independently installable;
 keep its references and policies inside its directory.
 
-Use [swe-init](swe-init/SKILL.md) to activate existing packages. Creating or
-refining personal rules is separate authoring work: review the user's evidence,
-confirm candidate interpretations, and update the owning private package.
+Use `swe-author` to define scope, review the user's evidence, confirm candidate
+interpretations, and validate the owning package. Explicit user requirements
+can be recorded directly; inferred preferences remain proposals until confirmed.
+Use `swe-init` to activate existing packages when requested. Authoring a skill
+does not activate it.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their
