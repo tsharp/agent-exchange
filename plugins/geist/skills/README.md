@@ -21,6 +21,11 @@ can be recorded directly; inferred preferences remain proposals until confirmed.
 Use `swe-init` to activate existing packages when requested. Authoring a skill
 does not activate it.
 
+For a new SWE kit, `swe-author` recommends authoring `swe-communication-style`
+and `swe-style` first. Their content comes from the user's requirements and
+confirmed preferences; personal rules are not bundled with Geist. Language
+packages are added according to the user's work.
+
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their
 task-relevant references. Interviews, samples, and proposals are excluded unless

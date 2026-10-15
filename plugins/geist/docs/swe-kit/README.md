@@ -36,6 +36,11 @@ Explicit user requirements are already confirmed; inferred preferences remain
 proposals until accepted. Validate the package before handing off to `swe-init`
 for requested activation. Authoring alone does not change startup routing.
 
+The recommended starting set for a new kit is `swe-communication-style` and
+`swe-style`. These names identify authored communication and general engineering
+packages; their rules come from the consuming user. Add language packages when
+needed. Recommendations do not add defaults to setup code or activate routes.
+
 ## Verification
 
 Run `npm test` from the marketplace root after changing configuration, skills,

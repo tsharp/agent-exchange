@@ -2,7 +2,7 @@
 name: swe-author
 description: Create or refine SWE skills from the user's requirements, interviews, and representative engineering work. Use for authoring engineering practices, language styles, communication rules, or engineering workflows; activating existing packages is separate setup work.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   updated: 2026-10-14
   status: stable
 ---
@@ -22,6 +22,19 @@ skills belong in the requested workspace skill directory. Public plugin skills
 contain reusable workflows, never private prescriptions or source evidence.
 
 ## Steps
+
+For an open-ended request to build a SWE kit, recommend these two authored
+packages first:
+
+| Package | Scope |
+| --- | --- |
+| `swe-communication-style` | Communication, technical prose, and collaboration |
+| `swe-style` | Language-independent engineering practices |
+
+These are recommended package names and scopes, not bundled personal rules.
+Derive their content from the user's choices. Add language-specific packages
+only when relevant to their work. Honor a narrower request or existing package
+names, reuse packages already present, and keep activation explicit.
 
 1. **Establish the contract.** Identify what requests should trigger the skill,
    its intended reader, the behavior it governs, and its destination. Inspect an

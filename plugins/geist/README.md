@@ -83,6 +83,10 @@ confirmation, and packages and validates accepted guidance. It also supports
 refining an existing skill or authoring a project workflow. Creating a skill
 does not activate it; use `swe-init` when startup routing is wanted.
 
+For a new kit, the recommended starting packages are `swe-communication-style`
+and `swe-style`, authored from your communication and engineering choices.
+Language-specific packages are added when needed.
+
 Select existing packages in global or workspace configuration:
 
 ```toml
