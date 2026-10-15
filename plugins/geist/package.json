@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@huggingface/tokenizers": "0.2.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@types/node": "^22.20.1",
     "esbuild": "^0.25.12",
     "smol-toml": "^1.8.0",
