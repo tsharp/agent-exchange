@@ -62,6 +62,12 @@ personal ownership: inferred preferences remain proposals, and canonical rules
 stay in the personal store. Standards apply during implementation and review.
 These workflows remain optional tools rather than a mandatory task pipeline.
 
+Keep adaptation provenance in the plugin README's
+[skill provenance](../../README.md#skill-provenance) section, outside instruction
+bodies. Record the marked upstream package version, exact source revision, each
+adapted skill's version, and changes from upstream. Keep the upstream license
+inside each independently installable adapted package.
+
 ## Verification
 
 Run `npm test` from the marketplace root after changing configuration, skills,

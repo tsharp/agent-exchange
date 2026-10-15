@@ -48,7 +48,9 @@ These packages do not require an issue tracker, extra approval rounds for routin
 choices, or mandatory agent orchestration. They retain distinct names from the
 upstream skills so the chosen workflow is explicit.
 Their upstream MIT notices are retained inside each independently installable
-adapted package.
+adapted package. The plugin README records [skill provenance](../README.md#skill-provenance),
+including the pinned upstream version and revision, adapted versions, and changes
+to each workflow.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their

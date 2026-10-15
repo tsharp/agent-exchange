@@ -2,7 +2,7 @@
 name: swe-prototype
 description: Build a small disposable experiment to answer a concrete engineering, state-model, integration, or UI design question. Use when an experiment would resolve uncertainty faster than discussion; ordinary implementation does not require a prototype.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   updated: 2026-10-15
   status: stable
 ---
@@ -68,8 +68,3 @@ polish, or documentation machinery to a disposable experiment.
 - The finding is retained in an appropriate existing place; retained artifacts
   are clearly marked and runnable.
 - Any resulting production change follows applicable styles and project checks.
-
-## Provenance
-
-Adapted from Matt Pocock's `prototype` at upstream revision `49dd158`.
-The upstream [MIT notice](LICENSE) is retained with this independent package.

@@ -2,7 +2,7 @@
 name: swe-review
 description: Review a branch, commit range, or working changes against the requested behavior and applicable engineering standards. Use for code review or an authorized implementation review; ordinary edits do not require a separate review workflow.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   updated: 2026-10-15
   status: stable
 ---
@@ -77,8 +77,3 @@ new specification document, or setup workflow is a prerequisite.
   distinguished from violations.
 - Verification, missing requirements, and other review limits are stated plainly.
 - Any edits remain within the user's authorized scope.
-
-## Provenance
-
-Adapted from Matt Pocock's `code-review` at upstream revision `49dd158`.
-The upstream [MIT notice](LICENSE) is retained with this independent package.

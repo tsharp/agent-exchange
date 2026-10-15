@@ -2,7 +2,7 @@
 name: swe-diagnose
 description: Diagnose and fix a reported software failure or performance regression using a reproduction, targeted investigation, and verification of the original symptom. Use for debugging; an obvious local correction does not require a full investigation.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   updated: 2026-10-15
   status: stable
 ---
@@ -78,8 +78,3 @@ did not hold. Do not add phases, documents, or approval steps solely for process
 - Applicable styles and required project checks were followed; temporary
   instrumentation is removed.
 - The report states the outcome and evidence without unsupported certainty.
-
-## Provenance
-
-Adapted from Matt Pocock's `diagnosing-bugs` at upstream revision `49dd158`.
-The upstream [MIT notice](LICENSE) is retained with this independent package.

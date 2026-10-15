@@ -327,6 +327,31 @@ $geistStart = $geistHooks.hooks.SessionStart.hooks | Where-Object { $_.statusMes
 
 This executes the configured startup hook and prints its stderr alongside protocol output. `Cannot find module` naming an old installed snapshot means the registration is stale. That failure happens before Geist starts, so an in-process Geist logger cannot capture it. Persistent failure diagnostics would need to capture launcher stderr as well as runtime errors; prompts, hook payloads, and retrieved content should stay out of diagnostic logs. Geist currently emits runtime diagnostics to stderr and does not maintain a failure log file.
 
+## Skill provenance
+
+The four workflows below adapt Matt Pocock's
+[skills repository](https://github.com/mattpocock/skills/tree/49dd158d1076134a641b33efb035946536778336).
+The source package is marked **1.3.1** at commit
+`49dd158d1076134a641b33efb035946536778336`; this is the pinned source snapshot,
+not a claim that each upstream skill has its own version tag.
+
+All four adaptations follow the communication, general engineering, and language
+styles selected by active instructions. They keep personal prescriptions in the
+consuming user's canonical packages and use those terms and confirmed rules.
+
+| Geist skill and version | Upstream source at the pinned revision | Changes from upstream |
+| --- | --- | --- |
+| [swe-diagnose 1.0.1](skills/swe-diagnose/SKILL.md) | [diagnosing-bugs](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/diagnosing-bugs/SKILL.md) | Scales investigation to uncertainty; removes fixed hypothesis counts and compulsory phase checkpoints; permits code reading to establish a reproduction and useful analysis when reproduction is unavailable; chooses regression coverage without routine confirmation; reports verification limits. |
+| [swe-prototype 1.0.1](skills/swe-prototype/SKILL.md) | [prototype](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/prototype/SKILL.md) | Supports CLI fixtures, language examples, benchmarks, and integration harnesses alongside UI demos; chooses the cheapest faithful experiment; permits useful assertions; makes branch archival optional; preserves the finding in an existing artifact. |
+| [swe-review 1.0.1](skills/swe-review/SKILL.md) | [code-review](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/code-review/SKILL.md) | Assesses behavior and standards separately, then combines findings by consequence; makes delegation optional; removes tracker setup and the mandatory generic smell baseline; accepts conversation requirements; covers staged, unstaged, and relevant untracked changes; infers an established review scope when possible. |
+| [swe-retro 1.0.1](skills/swe-retro/SKILL.md) | [retro](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/retro/SKILL.md) | Uses observed friction and prevention value to justify changes; checks existing tooling first; avoids mandatory new checks or rules for isolated mistakes; keeps standards applicable during implementation and review; distinguishes proposed preferences from confirmed rules and findings from authorized edits. |
+
+Version 1.0.0 introduced these adaptations. Version 1.0.1 moves provenance here
+from the skill bodies without changing their workflows. Each independent
+package retains the upstream MIT copyright and license in its `LICENSE` file.
+Keep this section aligned with skill versions, pinned source revisions, and
+subsequent changes to the adaptations.
+
 ## Develop Geist
 
 ```text

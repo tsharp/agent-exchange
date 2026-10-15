@@ -2,7 +2,7 @@
 name: swe-retro
 description: Review an engineering session or repeated workflow friction and propose evidence-backed improvements to tools, checks, navigation, and guidance. Use for a requested retrospective; do not add a retrospective to every task.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   updated: 2026-10-15
   status: stable
 ---
@@ -79,8 +79,3 @@ closing ceremony. No findings is an acceptable result.
   workflows contain no copied personal guidance or private source evidence.
 - Applied changes were authorized and verified; proposals and limitations remain
   explicit. No extra process was added merely to produce a retrospective.
-
-## Provenance
-
-Adapted from Matt Pocock's `retro` at upstream revision `49dd158`.
-The upstream [MIT notice](LICENSE) is retained with this independent package.
