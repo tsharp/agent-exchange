@@ -97,6 +97,12 @@ styles. The workflow checks evidence, explores concrete scenarios, and keeps
 accepted decisions separate from proposals. It stops when the agreed next step
 is clear, with remaining questions recorded.
 
+For engineering work, `swe-diagnose` builds a useful reproduction and verifies a
+correction; `swe-prototype` answers a concrete design question with a small
+experiment. Both follow the configured personal styles, choose appropriate
+artifacts and checks, and avoid a mandatory interview or tracker setup. They
+are workflows to use when needed, not extra steps for every change.
+
 Select existing packages in global or workspace configuration:
 
 ```toml

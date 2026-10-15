@@ -48,6 +48,13 @@ record accepted decisions as they settle, and keep unresolved interpretations
 visible. It can prepare accepted choices for `swe-author` without requiring skill
 creation, a glossary, or formal decision records for every subject.
 
+Engineering workflows such as `swe-diagnose` and `swe-prototype` apply the styles
+selected by active instructions. Their public packages contain reusable task
+steps and upstream attribution, not personal prescriptions. Keep the two core
+authored styles as the starting recommendation; workflows do not add themselves
+to startup routing or require tracker setup. Each adapted package retains its
+upstream license so it can be installed independently.
+
 ## Verification
 
 Run `npm test` from the marketplace root after changing configuration, skills,

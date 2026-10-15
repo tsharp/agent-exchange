@@ -1,12 +1,14 @@
 # Geist skills
 
-Geist ships three reusable workflows:
+Geist ships these reusable workflows:
 
 | Skill | Use for |
 | --- | --- |
 | [swe-author](swe-author/SKILL.md) | Creating or refining SWE skills from requirements and evidence |
 | [swe-init](swe-init/SKILL.md) | Routing selected existing skills through startup instruction injection |
 | [refine-with-docs](refine-with-docs/SKILL.md) | Refining ideas, plans, requirements, processes, and drafts through an interview and evolving docs |
+| [swe-diagnose](swe-diagnose/SKILL.md) | Reproducing a software failure, investigating its cause, and verifying a correction |
+| [swe-prototype](swe-prototype/SKILL.md) | Resolving a concrete engineering or UI question with a small experiment |
 
 These contain no personal style prescriptions, interview transcripts, or sample
 projects.
@@ -32,6 +34,14 @@ outcomes. It uses focused question rounds, concrete examples, and updates to a
 working document. It supports subjects beyond engineering and can establish
 accepted choices before `swe-author` packages them. It does not require other
 installed skills or activate routes.
+
+The engineering workflows follow the communication, general engineering, and
+language styles selected by active instructions. They keep personal rules in
+their canonical packages and scale investigation and artifacts to the task.
+Use diagnosis for a reported failure and a prototype for an uncertainty best
+answered experimentally. Neither is a prerequisite for routine implementation.
+Their upstream MIT notices are retained inside each independently installable
+adapted package.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their

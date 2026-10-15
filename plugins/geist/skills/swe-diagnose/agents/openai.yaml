@@ -1,0 +1,3 @@
+interface:
+  display_name: "SWE Diagnose"
+  short_description: "Diagnose failures and verify the reported behavior"
