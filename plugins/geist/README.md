@@ -87,6 +87,16 @@ For a new kit, the recommended starting packages are `swe-communication-style`
 and `swe-style`, authored from your communication and engineering choices.
 Language-specific packages are added when needed.
 
+For broader refinement, invoke `refine-with-docs`, for example:
+
+> Help me refine this team handover process. Ask focused questions and update
+> the document as we settle decisions.
+
+It supports plans, requirements, proposals, processes, and drafts as well as
+styles. The workflow checks evidence, explores concrete scenarios, and keeps
+accepted decisions separate from proposals. It stops when the agreed next step
+is clear, with remaining questions recorded.
+
 Select existing packages in global or workspace configuration:
 
 ```toml

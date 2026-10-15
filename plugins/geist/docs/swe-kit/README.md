@@ -9,6 +9,7 @@ setup mechanism; consuming users own their style prescriptions and evidence.
 | --- | --- | --- |
 | Plugin `skills/swe-init/` | Generic configuration workflow and setup script | Used when setting up or repairing routes |
 | Plugin `skills/swe-author/` | Generic SWE skill authoring workflow | Used when creating or refining packages |
+| Plugin `skills/refine-with-docs/` | General refinement interview and documentation workflow | Used when clarifying a subject with written outcomes |
 | `~/.geist/skills/<name>/` | Personal skill, references, and lint policies | Routed only when selected in `instructions.skills` |
 | `~/.geist/docs/` | Personal interviews and proposals | Outside instruction routing |
 | `~/.geist/samples/` | Personal implementation evidence | Outside instruction routing |
@@ -40,6 +41,12 @@ The recommended starting set for a new kit is `swe-communication-style` and
 `swe-style`. These names identify authored communication and general engineering
 packages; their rules come from the consuming user. Add language packages when
 needed. Recommendations do not add defaults to setup code or activate routes.
+
+Use `refine-with-docs` for an adaptive interview with evolving documentation,
+including subjects outside SWE. Check concrete scenarios and source authorship,
+record accepted decisions as they settle, and keep unresolved interpretations
+visible. It can prepare accepted choices for `swe-author` without requiring skill
+creation, a glossary, or formal decision records for every subject.
 
 ## Verification
 

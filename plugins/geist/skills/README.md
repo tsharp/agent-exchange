@@ -1,13 +1,14 @@
 # Geist skills
 
-Geist ships two reusable workflows:
+Geist ships three reusable workflows:
 
 | Skill | Use for |
 | --- | --- |
 | [swe-author](swe-author/SKILL.md) | Creating or refining SWE skills from requirements and evidence |
 | [swe-init](swe-init/SKILL.md) | Routing selected existing skills through startup instruction injection |
+| [refine-with-docs](refine-with-docs/SKILL.md) | Refining ideas, plans, requirements, processes, and drafts through an interview and evolving docs |
 
-Neither contains personal style prescriptions, interview transcripts, or sample
+These contain no personal style prescriptions, interview transcripts, or sample
 projects.
 
 Keep personal packages in `~/.geist/skills/<name>/SKILL.md` (or
@@ -25,6 +26,12 @@ For a new SWE kit, `swe-author` recommends authoring `swe-communication-style`
 and `swe-style` first. Their content comes from the user's requirements and
 confirmed preferences; personal rules are not bundled with Geist. Language
 packages are added according to the user's work.
+
+Use `refine-with-docs` when the user needs help clarifying a subject with written
+outcomes. It uses focused question rounds, concrete examples, and updates to a
+working document. It supports subjects beyond engineering and can establish
+accepted choices before `swe-author` packages them. It does not require other
+installed skills or activate routes.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their
