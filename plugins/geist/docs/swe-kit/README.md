@@ -62,6 +62,14 @@ personal ownership: inferred preferences remain proposals, and canonical rules
 stay in the personal store. Standards apply during implementation and review.
 These workflows remain optional tools rather than a mandatory task pipeline.
 
+`swe-maintainability` and `swe-architecture` are evaluation workflows with
+script-generated offline HTML reports. Keep their report scripts and contracts
+inside each package so either can be installed independently. Tests exercise
+both isolated packages, input validation, escaping, diagrams, and partial or empty
+evaluations. Their renderer copies are kept aligned by a parity check; maintain
+the rendering contract in both packages. Findings are agent-authored evidence,
+not automated measurements of code quality or permission to refactor.
+
 Keep adaptation provenance in the plugin README's
 [skill provenance](../../README.md#skill-provenance) section, outside instruction
 bodies. Record the marked upstream package version, exact source revision, each

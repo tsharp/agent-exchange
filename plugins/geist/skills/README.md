@@ -10,6 +10,8 @@ Geist ships these reusable workflows:
 | [swe-diagnose](swe-diagnose/SKILL.md) | Reproducing a software failure, investigating its cause, and verifying a correction |
 | [swe-prototype](swe-prototype/SKILL.md) | Resolving a concrete engineering or UI question with a small experiment |
 | [swe-review](swe-review/SKILL.md) | Reviewing requested behavior and confirmed standards in one actionable report |
+| [swe-maintainability](swe-maintainability/SKILL.md) | Evaluating maintenance friction with a scripted HTML report |
+| [swe-architecture](swe-architecture/SKILL.md) | Evaluating architecture with a scripted visual HTML report |
 | [swe-retro](swe-retro/SKILL.md) | Proposing evidence-backed improvements after significant work or recurring friction |
 | [slop-checker](slop-checker/SKILL.md) | Classifying a response, draft, code change, or assistant trace as slop or not slop, with evidence |
 
@@ -59,6 +61,14 @@ Their upstream MIT notices are retained inside each independently installable
 adapted package. The plugin README records [skill provenance](../README.md#skill-provenance),
 including the pinned upstream version and revision, adapted versions, and changes
 to each workflow.
+
+`swe-maintainability` and `swe-architecture` evaluate a codebase or subsystem,
+record source evidence and explicit coverage, and always generate an offline HTML
+report through their own bundled Node.js script. Each package works independently
+without npm dependencies. Evaluation does not authorize implementation. The
+maintainability workflow assesses understanding, change cost, state and failures,
+verification, and operations; architecture assesses module depth, locality,
+dependency direction, ownership, and testability with before/after diagrams.
 
 Geist injects each configured skill's description and canonical file path at
 session and subagent startup. The agent reads applicable skill bodies and their

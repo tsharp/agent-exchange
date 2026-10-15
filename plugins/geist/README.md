@@ -110,6 +110,18 @@ configured personal styles. Review does not require parallel agents, and a
 retrospective does not automatically add rules or edit configuration. The
 [skills index](skills/README.md) lists all workflows and their intended scope.
 
+Use `swe-maintainability` to evaluate maintenance costs or `swe-architecture` to
+evaluate module depth, dependencies, and responsibility boundaries:
+
+```text
+Use $swe-maintainability to evaluate this subsystem's maintenance costs.
+Use $swe-architecture to evaluate this subsystem's architecture.
+```
+
+Each generates an offline HTML report through its bundled Node.js script,
+including when evidence is incomplete or no findings are warranted. Architecture
+reports include before/after diagrams. Neither evaluation authorizes refactoring.
+
 For a quick quality check, use `slop-checker` on a response, draft, code change,
 or assistant trace. It returns exactly `slop` or `not slop` on the first line,
 then explains why with concrete evidence and recommends specific fixes. A
@@ -336,13 +348,13 @@ This executes the configured startup hook and prints its stderr alongside protoc
 
 ## Skill provenance
 
-The four workflows below adapt Matt Pocock's
+Five workflows below adapt Matt Pocock's
 [skills repository](https://github.com/mattpocock/skills/tree/49dd158d1076134a641b33efb035946536778336).
 The source package is marked **1.3.1** at commit
 `49dd158d1076134a641b33efb035946536778336`; this is the pinned source snapshot,
 not a claim that each upstream skill has its own version tag.
 
-All four adaptations follow the communication, general engineering, and language
+All five adaptations follow the communication, general engineering, and language
 styles selected by active instructions. They keep personal prescriptions in the
 consuming user's canonical packages and use those terms and confirmed rules.
 
@@ -352,12 +364,26 @@ consuming user's canonical packages and use those terms and confirmed rules.
 | [swe-prototype 1.0.1](skills/swe-prototype/SKILL.md) | [prototype](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/prototype/SKILL.md) | Supports CLI fixtures, language examples, benchmarks, and integration harnesses alongside UI demos; chooses the cheapest faithful experiment; permits useful assertions; makes branch archival optional; preserves the finding in an existing artifact. |
 | [swe-review 1.0.1](skills/swe-review/SKILL.md) | [code-review](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/code-review/SKILL.md) | Assesses behavior and standards separately, then combines findings by consequence; makes delegation optional; removes tracker setup and the mandatory generic smell baseline; accepts conversation requirements; covers staged, unstaged, and relevant untracked changes; infers an established review scope when possible. |
 | [swe-retro 1.0.1](skills/swe-retro/SKILL.md) | [retro](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/retro/SKILL.md) | Uses observed friction and prevention value to justify changes; checks existing tooling first; avoids mandatory new checks or rules for isolated mistakes; keeps standards applicable during implementation and review; distinguishes proposed preferences from confirmed rules and findings from authorized edits. |
+| [swe-architecture 1.0.0](skills/swe-architecture/SKILL.md) | [improve-codebase-architecture](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/improve-codebase-architecture/SKILL.md) and [codebase-design](https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/codebase-design/SKILL.md) | Retains hotspot exploration, depth, the deletion test, locality, and visual before/after candidates; adds dependency direction, ownership, explicit evidence and coverage; follows active terminology and contextual adapter decisions; replaces hand-authored CDN reports with a bundled offline generator; completes evaluation without mandatory delegation, selection, interviews, or repository edits. |
 
-Version 1.0.0 introduced these adaptations. Version 1.0.1 moves provenance here
-from the skill bodies without changing their workflows. Each independent
+Version 1.0.0 introduced each adaptation. For the first four, version 1.0.1 moves
+provenance here from the skill bodies without changing their workflows. Each independent
 package retains the upstream MIT copyright and license in its `LICENSE` file.
 Keep this section aligned with skill versions, pinned source revisions, and
 subsequent changes to the adaptations.
+
+[swe-maintainability 1.0.0](skills/swe-maintainability/SKILL.md) is an original
+workflow for evaluating comprehension, change locality, state and failures,
+verification, and operations. Both evaluation skills generate reports through
+package-local scripts with no npm dependencies.
+
+Each workflow records structured source evidence and coverage, then runs
+`node <skill-directory>/scripts/generate-report.mjs <assessment.json> [new-report.html]`.
+The default output is a unique file in the OS temporary directory; existing
+files are never replaced. Reports work offline. Architecture findings include
+static before/after diagrams. The agent makes the assessment; the script
+validates its structure and renders it. Both workflows produce reports even
+with no findings or incomplete evidence, and neither authorizes refactoring.
 
 [slop-checker 1.1.0](skills/slop-checker/SKILL.md) is an original, research-informed
 workflow, not an adaptation of an upstream skill. Its

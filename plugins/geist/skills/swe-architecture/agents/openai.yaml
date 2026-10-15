@@ -1,0 +1,3 @@
+interface:
+  display_name: "SWE Architecture"
+  short_description: "Evaluate architecture and generate a visual report"
